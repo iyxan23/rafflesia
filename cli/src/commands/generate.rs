@@ -1,0 +1,16 @@
+use clap::{AppSettings, Arg, ArgMatches, Command};
+use anyhow::Result;
+
+pub fn cli() -> Command {
+    Command::new("generate")
+        .dont_collapse_args_in_usage(true)
+        .setting(AppSettings::DeriveDisplayOrder)
+        .about("Generate a rafflesia project from a sketchware project")
+        .after_help("Run `rafflesia help generate` for more detailed information.\n")
+}
+
+pub fn exec(args: &ArgMatches) -> Result<()> {
+    println!("generate");
+
+    Ok(())
+}

@@ -7,3 +7,5 @@ edition = "2021"
 
 [dependencies]
 rafflesia = { path = "../rafflesia" }
+clap = "^3.1.13"
+anyhow = "^1.0.57"
