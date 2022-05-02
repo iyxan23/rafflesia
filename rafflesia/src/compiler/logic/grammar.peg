@@ -1,0 +1,60 @@
+# PEG-like + BNF-like grammar, used only for reference
+
+outer-scope-statements = ("\n"+ statement)*
+outer-scope-statement  = variable-declaration |
+                         list-declaration     |
+                         map-declaration      |
+                         event
+
+list-declaration       = "list" "<" primitive-types ">" identifier
+map-declaration        = "map" "<" primitive-types ">" identifier
+variable-declaration   = primitive-types identifier ("=" expression)?
+
+primitive-types        = "number" | "string"
+
+event                  = identifier ("." identifier)? "{" block-statements "}"
+
+inner-statements       = ("\n"+ inner-statement)*
+inner-statement        = simple-statements | compound-statements
+
+simple-statements      = variable-assignment |
+                         "break" |
+                         "continue"
+
+variable-assignment    = identifier "=" expression
+
+expression             = atom |
+                         boolean-expression
+
+boolean-expression     = boolean-expression ("&&" | "||") comparison-expression
+                         comparison-expression
+
+comparison-expression  = "!" comparison-expression |
+                         comparison-expression (">" | "<" | "==" | ">=" | "<=") arithmetic-expression
+                         arithmetic-expression
+
+arithmetic-expression  = arithmetic-expression "+" term |
+                         arithmetic-expression "-" term |
+                         term
+
+term                   = term "*" factor |
+                         term "/" factor |
+                         factor
+
+factor                 = "+" factor |
+                         "-" factor |
+                         power
+
+power                  = primary "**" factor |
+                         primary
+
+primary                = primary "." identifier |
+                         primary "(" arguments ")" |
+                         primary "[" expression "]"
+
+atom                   = identifier |
+                         "true" |
+                         "false" |
+                         "null" |
+                         string |
+                         number

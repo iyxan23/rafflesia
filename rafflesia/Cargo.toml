@@ -9,3 +9,4 @@ edition = "2021"
 swrs = { path = "../swrs" }
 toml = "^0.5.9"
 serde = "^0.9.15"
+anyhow = "^1.0.57"

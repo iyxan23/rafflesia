@@ -1,4 +1,4 @@
 pub mod core;
-pub mod logic;
-pub mod layout;
+pub mod compiler;
+pub mod generator;
 pub mod ops;

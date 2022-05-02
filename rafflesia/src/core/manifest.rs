@@ -1,3 +1,6 @@
+use std::fs;
+use std::path::{Path, PathBuf};
+use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use toml::map::Map;
 use toml::value::Datetime;
@@ -11,6 +14,7 @@ pub struct Manifest {
 }
 
 #[derive(Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct ProjectTable {
     pub id: Option<u16>,
     pub name: String,
@@ -24,6 +28,7 @@ pub struct ProjectTable {
 }
 
 #[derive(Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct ColorsTable {
     pub primary: String,
     pub primary_dark: String,
@@ -39,6 +44,7 @@ pub struct ActivityTable {
 }
 
 #[derive(Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct LibraryTable {
     pub compat: Option<CompatLibraryTable>,
     pub firebase: Option<FirebaseLibraryTable>,
@@ -52,12 +58,14 @@ pub struct CompatLibraryTable {
 }
 
 #[derive(Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct FirebaseLibraryTable {
     pub enabled: bool,
     pub api_key: String
 }
 
 #[derive(Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct AdMobLibraryTable {
     pub enabled: bool,
     pub api_key: String,
@@ -65,7 +73,18 @@ pub struct AdMobLibraryTable {
 }
 
 #[derive(Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct GoogleMapLibraryTable {
     pub enabled: bool,
     pub api_key: String
+}
+
+pub fn parse_manifest_str(content: &str) -> Result<Manifest> {
+    toml::from_str(content)?
+}
+
+pub fn parse_manifest(path: PathBuf) -> Result<Manifest> {
+    parse_manifest_str(
+        &fs::read_to_string(path).context("")?
+    )
 }
