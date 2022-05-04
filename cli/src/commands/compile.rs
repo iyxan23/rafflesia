@@ -1,7 +1,7 @@
-use clap::{AppSettings, Arg, ArgMatches, Command};
+use clap::{AppSettings, ArgMatches, Command};
 use anyhow::Result;
 
-pub fn cli() -> Command {
+pub fn cli() -> Command<'static> {
     Command::new("compile")
         .dont_collapse_args_in_usage(true)
         .setting(AppSettings::DeriveDisplayOrder)

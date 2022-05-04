@@ -1,7 +1,7 @@
 use clap::{ArgMatches, Command};
 use anyhow::Result;
 
-pub fn builtin() -> Vec<Command> {
+pub fn builtin() -> Vec<Command<'static>> {
     vec![
         new::cli(),
         compile::cli(),
