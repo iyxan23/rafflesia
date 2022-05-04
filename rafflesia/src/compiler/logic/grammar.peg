@@ -1,60 +1,81 @@
 # PEG-like + BNF-like grammar, used only for reference
 
-outer-scope-statements = ("\n"+ statement)*
-outer-scope-statement  = variable-declaration |
-                         list-declaration     |
-                         map-declaration      |
-                         event
+# () is a group
+# ..+ to match at least one or more
+# ..* to match at least zero or more
+# | or
+# ? optional
+# ".." a terminal symbol / token
+# identifier an... identifier
 
-list-declaration       = "list" "<" primitive-types ">" identifier
-map-declaration        = "map" "<" primitive-types ">" identifier
-variable-declaration   = primitive-types identifier ("=" expression)?
+outer-statements        = (outer-statement "\n"+)*
+outer-statement         = variable-declaration |
+                          list-declaration     |
+                          map-declaration      |
+                          event
 
-primitive-types        = "number" | "string"
+list-declaration        = "list" "<" primitive-types ">" identifier
+map-declaration         = "map" "<" primitive-types ">" identifier
+variable-declaration    = primitive-types identifier ("=" expression)?
 
-event                  = identifier ("." identifier)? "{" block-statements "}"
+primitive-types         = "number" | "string"
 
-inner-statements       = ("\n"+ inner-statement)*
-inner-statement        = simple-statements | compound-statements
+event                   = identifier ("." identifier)? "{" inner-statements "}"
 
-simple-statements      = variable-assignment |
-                         "break" |
-                         "continue"
+inner-statements        = ("\n"+ inner-statement "\n"+)* "\n"*
+inner-statement         = simple-statements | compound-statements
 
-variable-assignment    = identifier "=" expression
+simple-statements       = variable-assignment |
+                          if-statement |
+                          repeat-statement |
+                          forever-statement |
+                          "break" |
+                          "continue"
 
-expression             = atom |
-                         boolean-expression
+variable-assignment     = identifier "=" expression
 
-boolean-expression     = boolean-expression ("&&" | "||") comparison-expression
-                         comparison-expression
+if-statement            = "if" expression "{" inner-statements "}"
+                          ("else" "{" inner-statements "}")?
 
-comparison-expression  = "!" comparison-expression |
-                         comparison-expression (">" | "<" | "==" | ">=" | "<=") arithmetic-expression
-                         arithmetic-expression
+repeat-statement        = "repeat" expression "{" inner-statements "}"
 
-arithmetic-expression  = arithmetic-expression "+" term |
-                         arithmetic-expression "-" term |
-                         term
+forever-statement       = "forever" "{" inner-statements "}"
 
-term                   = term "*" factor |
-                         term "/" factor |
-                         factor
+expression              = boolean-expression |
+                          atom
 
-factor                 = "+" factor |
-                         "-" factor |
-                         power
+boolean-expression      = boolean-expression ("&&" | "||") comparison-expression
+                          comparison-expression
 
-power                  = primary "**" factor |
-                         primary
+comparison-expression   = "!" comparison-expression |
+                          comparison-expression (">" | "<" | "==" | ">=" | "<=") arithmetic-expression |
+                          arithmetic-expression
 
-primary                = primary "." identifier |
-                         primary "(" arguments ")" |
-                         primary "[" expression "]"
+arithmetic-expression   = arithmetic-expression "+" term |
+                          arithmetic-expression "-" term |
+                          term
 
-atom                   = identifier |
-                         "true" |
-                         "false" |
-                         "null" |
-                         string |
-                         number
+term                    = term "*" factor |
+                          term "/" factor |
+                          factor
+
+factor                  = "+" factor |
+                          "-" factor |
+                          power
+
+power                   = primary "**" factor |
+                          primary
+
+primary                 = primary "." identifier |
+                          primary "(" arguments? ")" |
+                          primary "[" expression "]" |
+                          atom
+
+arguments               = expression ("," expression)* ","? # trailing comma
+
+atom                    = identifier |
+                          "true" |
+                          "false" |
+                          "null" |
+                          string |
+                          number
