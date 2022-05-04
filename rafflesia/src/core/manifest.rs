@@ -1,15 +1,14 @@
-use std::fs;
-use std::path::{Path, PathBuf};
+use std::{fs, collections::HashMap};
+use std::path::PathBuf;
 use anyhow::{Context, Result};
-use serde::{Deserialize, Serialize};
-use toml::map::Map;
+use serde::{Serialize, Deserialize};
 use toml::value::Datetime;
 
 // The structure of a swproj.toml file
 #[derive(Serialize, Deserialize)]
 pub struct Manifest {
     pub project: ProjectTable,
-    pub activity: Map<String, ActivityTable>,
+    pub activity: HashMap<String, ActivityTable>,
     pub library: Option<LibraryTable>
 }
 
@@ -80,11 +79,12 @@ pub struct GoogleMapLibraryTable {
 }
 
 pub fn parse_manifest_str(content: &str) -> Result<Manifest> {
-    toml::from_str(content)?
+    Ok(toml::from_str::<Manifest>(content)?)
 }
 
 pub fn parse_manifest(path: PathBuf) -> Result<Manifest> {
     parse_manifest_str(
-        &fs::read_to_string(path).context("")?
+        &fs::read_to_string(path.clone())
+            .context(format!("Failed to parse manifest at path {}", path.display()))?
     )
 }
