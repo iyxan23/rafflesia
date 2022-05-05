@@ -6,6 +6,7 @@ pub fn builtin() -> Vec<Command<'static>> {
         new::cli(),
         compile::cli(),
         generate::cli(),
+        metadata::cli(),
     ]
 }
 
@@ -14,6 +15,7 @@ pub fn builtin_exec(cmd: &str) -> Option<fn(&ArgMatches) -> Result<()>> {
         "new" => new::exec,
         "compile" => compile::exec,
         "generate" => generate::exec,
+        "metadata" => metadata::exec,
         _ => return None
     })
 }
@@ -21,3 +23,4 @@ pub fn builtin_exec(cmd: &str) -> Option<fn(&ArgMatches) -> Result<()>> {
 pub mod compile;
 pub mod generate;
 pub mod new;
+pub mod metadata;

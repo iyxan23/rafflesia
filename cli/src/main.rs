@@ -16,7 +16,7 @@ fn main() -> Result<()> {
         let func = commands::builtin_exec(subcommand)
             .context(format!("Subcommand {} does not exist", subcommand))?;
 
-        let _ = func(args);
+        func(args)?;
     }
 
     Ok(())
