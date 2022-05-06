@@ -20,29 +20,31 @@ LinearLayout (
     layout_height: match_parent,
     gravity: center
 ) {
-    Button (text: "Hello world"): myButton
+    TextView (text: "Hello world"),
+    Button (text: "Click me"): myButton
 }
 ```
 
 A view is defined by its name, then optionally a list of attributes inside parentheses `()`, followed by a curly brace
-block `{}` in which other views can be defined as its children; at the end, a colon `:` can be used to define the
-view id for the view.
+block `{}` in which other views can be defined as its children; each child are separated with `,` and at the end, a
+colon `:` can be used to define the view id for the view.
 
 ```text
 ParentView (attribute: value) {
     // a children of view `ParentView` set with id of `viewId1`
     // and its attributes defined in the parentheses
-    ChildrenView (otherAttribute: "string text"): viewId1
+    ChildrenView (otherAttribute: "string text"): viewId1,
 
     // children with no attributes set, but id set to `viewId2`
-    AnotherChildren: viewId2
+    AnotherChildren: viewId2,
 
     // children with nothing set
-    PlainChildren
+    PlainChildren, // trailing comma
 }
 ```
 
-The attributes inside parentheses can be split into lines, but the children cannot be one-lined.
+The attributes and children can either be separated into lines or one-lined as long as they are separated using commas
+(`,`).
 
 ```text
 LinearLayout (
@@ -50,13 +52,9 @@ LinearLayout (
     layout_width: match_parent,
     layout_height: match_parent, // <- trailing comma is okay
 ) {
-    TextView (text: "hello world")
+    TextView (text: "hello world"),
+    TextView (text: "another text"), // <- trailing comma is okay
 }
-
-...
-
-// not allowed
-LinearLayout { TextView (text: "hi") Button (text: "dont") }
 ```
 
 ### Global view access
@@ -68,10 +66,10 @@ Layout file (`main.layout`):
 ```text
 LinearLayout {
     // and edittext with id `myEditText`
-    EditText (hint: "Type a text here!"): myEditText
+    EditText (hint: "Type a text here!"): myEditText,
     
     // button with id `myButton`
-    Button (text: "Hello world"): myButton
+    Button (text: "Hello world"): myButton,
 }
 ```
 
