@@ -1,0 +1,7 @@
+view = alpha+ attributes? children?
+
+attributes = "(" (attribute ("," attribute)* ","?)? ")"
+attribute = value ":" value
+value = "\"" .* "\"" | alpha+
+
+children = "{" (view ("," view)* ","?)? "}"
