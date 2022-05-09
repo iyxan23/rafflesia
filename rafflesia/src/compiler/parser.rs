@@ -1,12 +1,29 @@
-use std::collections::VecDeque;
-use std::fmt::{Debug, Formatter};
+use std::fmt::Debug;
 use logos::{Lexer, Logos, Source};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct TokenWrapper<'source, T: Debug + Clone + PartialEq> {
-    token: T,
-    slice: &'source str,
-    pos: std::ops::Range<usize>
+    pub token: T,
+    pub slice: &'source str,
+    pub pos: std::ops::Range<usize>
+}
+
+// i think there's a better way of doing this
+#[derive(Debug, Clone, PartialEq)]
+pub struct TokenWrapperOwned<T: Debug + Clone + PartialEq> {
+    pub token: T,
+    pub slice: String,
+    pub pos: std::ops::Range<usize>
+}
+
+impl<T: Debug + Clone + PartialEq> From<TokenWrapper<'_, T>> for TokenWrapperOwned<T> {
+    fn from(tok: TokenWrapper<T>) -> Self {
+        TokenWrapperOwned {
+            token: tok.token,
+            slice: tok.slice.to_string(),
+            pos: tok.pos
+        }
+    }
 }
 
 pub struct LexerWrapper<'source, T: Logos<'source> + Debug + Clone + PartialEq>
@@ -20,11 +37,12 @@ pub struct LexerWrapper<'source, T: Logos<'source> + Debug + Clone + PartialEq>
         <<T as Logos<'source>>::Source as Source>::Slice: AsRef<str> {
 
     inner: Lexer<'source, T>,
-    cached_tokens: VecDeque<TokenWrapper<'source, T>>,
-    inner_index: u32,
+    cached_tokens: Vec<TokenWrapper<'source, T>>,
+    cache_start_point: usize,
+    inner_index: usize,
 
-    save_points: Vec<u32>,
-    index: u32,
+    save_points: Vec<usize>,
+    index: usize,
 }
 
 impl<'source, T> LexerWrapper<'source, T>
@@ -35,14 +53,16 @@ impl<'source, T> LexerWrapper<'source, T>
     pub fn new(inner: Lexer<'source, T>) -> LexerWrapper<'source, T> {
         LexerWrapper {
             inner,
-            cached_tokens: VecDeque::new(),
+            cached_tokens: Vec::new(),
+            cache_start_point: 0,
             inner_index: 0,
             save_points: vec![0],
             index: 0,
         }
     }
 
-    fn current_save_point(&self) -> Option<&u32> {
+    #[inline]
+    fn current_save_point(&self) -> Option<&usize> {
         self.save_points.get(self.save_points.len() - 1)
     }
 
@@ -65,12 +85,12 @@ impl<'source, T> LexerWrapper<'source, T>
             // yes, get it then
             self.index += 1;
 
-            self.cached_tokens.get(self.index as usize)
+            self.cached_tokens.get(self.index - self.cache_start_point)
         } else {
             // nope, this is up-to-date! go next and save it to the cache
             let next_token = self.inner.next()?; // will return None if there is none left
 
-            self.cached_tokens.push_front(TokenWrapper {
+            self.cached_tokens.push(TokenWrapper {
                 token: next_token,
                 slice: self.inner.slice().as_ref(),
                 pos: self.inner.span(),
@@ -79,24 +99,54 @@ impl<'source, T> LexerWrapper<'source, T>
             self.index += 1;
             self.inner_index += 1;
 
-            Some(&self.cached_tokens.front().unwrap())
+            Some(&self.cached_tokens.get(self.index - self.cache_start_point).unwrap())
         }
     }
 
-    // /// Do a check on the next token and if `f` returns true, it will return `Ok(tok)`. otherwise
-    // /// it will return an `Err()` with the message returned by the given `err` function.
-    // pub fn expect_fn_err<F, UEF>(&mut self, check: F, unexpected_tok_err: UEF)
-    //                              -> Result<&TokenWrapper<T>, error::ParseError<T>>
-    //     where
-    //         F: FnOnce(&T) -> bool,
-    //         UEF: FnOnce(&TokenWrapper<T>) -> String {
-    //
-    //     self.next().ok_or_else(||)
-    // }
-    //
-    // pub fn expect(&mut self, tok: &T) -> Result<&TokenWrapper<T>, error::ParseError<T>> {
-    //     self.expect_fn(|t| t == tok)
-    // }
+    /// Retrieves on how much tokens we've advanced since the last start()
+    pub fn get_index(&self) -> usize {
+        self.index - self.current_save_point()
+            .expect("start() must be called first")
+    }
+
+    /// Checks if the next token is as the token given, then return the token; otherwise it will
+    /// return a [`error::ParseError::UnexpectedTokenError`].
+    pub fn expect(&mut self, tok: T)
+        -> Result<TokenWrapperOwned<T>, error::ParseError<T, TokenWrapperOwned<T>>> {
+
+        let next: TokenWrapperOwned<T> = self.next().ok_or_else(||error::ParseError::EOF)?.clone().into();
+
+        if tok == next.token {
+            Ok(next)
+        } else {
+            self.restore();
+
+            Err(error::ParseError::UnexpectedTokenError {
+                expected: Some(tok),
+                range: next.pos.clone(),
+                unexpected_token: next.into(),
+            })
+        }
+    }
+
+    /// Opposite of [`LexerWrapper::expect`]
+    pub fn not_expect(&mut self, tok: T)
+        -> Result<TokenWrapperOwned<T>, error::ParseError<T, TokenWrapperOwned<T>>> {
+
+        let next: TokenWrapperOwned<T> = self.next().ok_or_else(||error::ParseError::EOF)?.clone().into();
+
+        if tok != next.token {
+            Ok(next)
+        } else {
+            self.restore();
+
+            Err(error::ParseError::UnexpectedTokenError {
+                expected: None,
+                range: next.pos.clone(),
+                unexpected_token: next.into(),
+            })
+        }
+    }
 
     pub fn previous(&mut self) -> Option<&T> {
         let state_start_point = self.current_save_point()
@@ -110,7 +160,7 @@ impl<'source, T> LexerWrapper<'source, T>
         // gogogogo
         self.index -= 1;
 
-        self.cached_tokens.get(self.index as usize)
+        self.cached_tokens.get(self.index - self.cache_start_point)
             .map(|c| &c.token)
     }
 
@@ -126,8 +176,11 @@ impl<'source, T> LexerWrapper<'source, T>
         self.index = state_start_point;
     }
 
-    /// Removes the current save point
+    /// Removes the current save point and deletes all the cached tokens before the current index
     pub fn success(&mut self) {
+        self.cached_tokens =
+            self.cached_tokens.split_off(self.index - self.cache_start_point - 1);
+
         self.save_points.pop()
             .expect("Failed to pop the previous save point, is success() called after a start()?");
     }
@@ -137,36 +190,53 @@ pub mod error {
     use std::error::Error;
     use std::fmt::{Debug, Display, Formatter};
 
-    pub enum ParseError<T> {
+    pub enum ParseError<ET: Debug, UET: Debug> {
         // unexpected token
         UnexpectedTokenError {
-            expected: T,
-            unexpected_token: T,
+            expected: Option<Vec<ET>>,
+            unexpected_token: UET,
             range: std::ops::Range<usize>,
-
-            // should usually be something like
-            // expected token {}, got {} instead
-            message: String,
         },
 
         // end of file
         EOF
     }
 
-    impl<T> Debug for ParseError<T> {
+    impl<ET: Debug, UET: Debug> Debug for ParseError<ET, UET> {
         fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
             match self {
-                ParseError::UnexpectedTokenError { message, .. } => write!(f, "{}", message),
+                ParseError::UnexpectedTokenError { expected, unexpected_token, .. } => {
+                    if let Some(e) = expected {
+                        if e.len() == 0 {
+                            write!(
+                                f,
+                                "expected token {:?}, got {:?} instead", e.get(0), unexpected_token
+                            )
+                        } else {
+                            write!(
+                                f,
+                                "expected a {}, got {:?} instead",
+                                e.iter()
+                                    .fold(String::new(), |acc, tok| {
+                                        format!("{:?} or", tok)
+                                    })[..3].to_string(), // removes the trailing ` or`
+                                unexpected_token
+                            )
+                        }
+                    } else {
+                        write!(f, "unexpected token {:?}", unexpected_token)
+                    }
+                },
                 ParseError::EOF => write!(f, "reached end-of-file")
             }
         }
     }
 
-    impl<T> Display for ParseError<T> {
+    impl<ET: Debug, UET: Debug> Display for ParseError<ET, UET> {
         fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
             <Self as Debug>::fmt(self, f)
         }
     }
 
-    impl<T> Error for ParseError<T> {}
+    impl<ET: Debug, UET: Debug> Error for ParseError<ET, UET> {}
 }
