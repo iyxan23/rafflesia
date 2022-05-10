@@ -1,4 +1,5 @@
 use std::fmt::Debug;
+use log::{info, trace};
 use logos::{Lexer, Logos, Source};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -70,6 +71,7 @@ impl<'source, T> LexerWrapper<'source, T>
     /// "checkpoint" in which the Lexer can be restored onto by calling [`restore()`], unless it
     /// got removed by calling [`success()`].
     pub fn start(&mut self) {
+        trace!("{}==> New start point", "  ".repeat(self.save_points.len()));
         // push a new state start point
         self.save_points.push(self.index);
     }
@@ -81,14 +83,9 @@ impl<'source, T> LexerWrapper<'source, T>
         self.current_save_point()
             .expect("start() must be called first");
 
-        // check if the next token is in the cache
-        if self.index > self.inner_index {
-            // yes, get it then
-            self.index += 1;
-
-            self.cached_tokens.get(self.index - self.cache_start_point)
-        } else {
-            // nope, this is up-to-date! go next and save it to the cache
+        // check if the next token is not already cached
+        if self.index >= self.inner_index {
+            // yep, this is up-to-date! go next and save it to the cache
             let next_token = self.inner.next()?; // will return None if there is none left
 
             self.cached_tokens.push(TokenWrapper {
@@ -97,10 +94,21 @@ impl<'source, T> LexerWrapper<'source, T>
                 pos: self.inner.span(),
             });
 
+            let ret = self.cached_tokens.get(self.index - self.cache_start_point);
+
             self.index += 1;
             self.inner_index += 1;
 
-            self.cached_tokens.get(self.index - self.cache_start_point)
+            trace!("{}-> next (now {}, inner {}): {:?}", "  ".repeat(self.save_points.len()), self.index, self.inner_index, ret);
+
+            ret
+        } else {
+            // nope, get it then
+            let ret = self.cached_tokens.get(self.index - self.cache_start_point);
+            self.index += 1;
+
+            trace!("{}-> next [c] (now {}, inner {}): {:?}", "  ".repeat(self.save_points.len()), self.index, self.inner_index, ret);
+            ret
         }
     }
 
@@ -123,8 +131,12 @@ impl<'source, T> LexerWrapper<'source, T>
             .into();
 
         if tok == next.token {
+            trace!("{} - expected {:?}", "  ".repeat(self.save_points.len()), next);
+
             Ok(next)
         } else {
+            trace!("{} ! unexpected {:?} (expected {:?})", "  ".repeat(self.save_points.len()), next, tok);
+
             Err(error::ParseError::UnexpectedTokenError {
                 expected: Some(vec![tok]),
                 pos: next.pos.clone(),
@@ -156,8 +168,12 @@ impl<'source, T> LexerWrapper<'source, T>
             .into();
 
         if tokens.contains(&next.token) {
+            trace!("{} - expected {:?} (expecting mult {:?})", "  ".repeat(self.save_points.len()), next, tokens);
+
             Ok(next)
         } else {
+            trace!("{} ! unexpected {:?} (expecting mult {:?})", "  ".repeat(self.save_points.len()), next, tokens);
+
             Err(error::ParseError::UnexpectedTokenError {
                 expected: Some(tokens),
                 pos: next.pos.clone(),
@@ -179,8 +195,12 @@ impl<'source, T> LexerWrapper<'source, T>
             .into();
 
         if tok != next.token {
+            trace!("{} - expected {:?} (not expecting {:?})", "  ".repeat(self.save_points.len()), next, tok);
+
             Ok(next)
         } else {
+            trace!("{} ! unexpected {:?} (not expecting {:?})", "  ".repeat(self.save_points.len()), next, tok);
+
             Err(error::ParseError::UnexpectedTokenError {
                 expected: None,
                 pos: next.pos.clone(),
@@ -205,7 +225,9 @@ impl<'source, T> LexerWrapper<'source, T>
         // gogogogo
         self.index -= 1;
 
-        self.cached_tokens.get(self.index - self.cache_start_point)
+        let ret = self.cached_tokens.get(self.index - self.cache_start_point);
+        trace!("{}<- previous (now {}): {:?}", "  ".repeat(self.save_points.len()), self.index, ret);
+        ret
     }
 
     /// Peeks one token ahead. Basically does [`next()`] and then [`previous()`].
@@ -216,22 +238,28 @@ impl<'source, T> LexerWrapper<'source, T>
         let next = self.next()?.clone().into();
         self.previous();
 
+        trace!("{} - peeked {:?}", "  ".repeat(self.save_points.len()), next);
+
         Some(next)
     }
 
-    /// Peeks one token ahead, and expects a token.
+    /// Peeks one token ahead, and expects a token. Then go back no matter what
     pub fn expect_peek(&mut self, tok: T)
         -> Result<TokenWrapperOwned<T>, error::ParseError<T, TokenWrapperOwned<T>>> {
 
-        let res = self.expect(tok)?;
+        trace!("{} - expect_peeking {:?}", "  ".repeat(self.save_points.len()), tok);
+
+        let res = self.expect(tok);
         let _ = self.previous().unwrap();
 
-        Ok(res)
+        res
     }
 
     /// Peeks one token ahead, and not expect a token.
     pub fn not_expect_peek(&mut self, tok: T)
                        -> Result<TokenWrapperOwned<T>, error::ParseError<T, TokenWrapperOwned<T>>> {
+
+        trace!("{} - not_expect_peeking {:?}", "  ".repeat(self.save_points.len()), tok);
 
         let res = self.not_expect(tok)?;
         let _ = self.previous().unwrap();
@@ -249,17 +277,27 @@ impl<'source, T> LexerWrapper<'source, T>
                     called after a start()?"
             );
 
+        info!("Restoring lexer to state {}", state_start_point);
+
         // we just set the index to be the state start point lol
         self.index = state_start_point;
     }
 
     /// Removes the current save point and **deletes** all the cached tokens before the current index
     pub fn success(&mut self) {
-        self.cached_tokens =
-            self.cached_tokens.split_off(self.index - self.cache_start_point - 1);
+        // prevents splitting when there are multiple success calls at the end of parsing
+        // (since there isn't any tokens left)
+        if self.index != self.cache_start_point {
+            self.cached_tokens =
+                self.cached_tokens.split_off(self.index - self.cache_start_point - 1);
+        }
+
+        self.cache_start_point = self.index - 1;
 
         self.save_points.pop()
             .expect("Failed to pop the previous save point, is success() called after a start()?");
+
+        trace!("{}<== success ({})", "  ".repeat(self.save_points.len() + 1), self.index);
     }
 }
 
