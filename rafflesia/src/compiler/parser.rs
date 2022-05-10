@@ -74,6 +74,7 @@ impl<'source, T> LexerWrapper<'source, T>
         self.save_points.push(self.index);
     }
 
+    /// Gets the next token, if cached it will use the cache instead.
     pub fn next(&mut self) -> Option<&TokenWrapper<T>> {
         // it's not _really_ necessary to get the current save point,
         // it's only for the sake of consistency
@@ -99,31 +100,67 @@ impl<'source, T> LexerWrapper<'source, T>
             self.index += 1;
             self.inner_index += 1;
 
-            Some(&self.cached_tokens.get(self.index - self.cache_start_point).unwrap())
+            self.cached_tokens.get(self.index - self.cache_start_point)
         }
     }
 
-    /// Retrieves on how much tokens we've advanced since the last start()
+    /// Gets the count on how much tokens we've advanced since the last start()
     pub fn get_index(&self) -> usize {
         self.index - self.current_save_point()
             .expect("start() must be called first")
     }
 
     /// Checks if the next token is as the token given, then return the token; otherwise it will
-    /// return a [`error::ParseError::UnexpectedTokenError`].
+    /// return a [`error::ParseError::UnexpectedTokenError`]
     pub fn expect(&mut self, tok: T)
         -> Result<TokenWrapperOwned<T>, error::ParseError<T, TokenWrapperOwned<T>>> {
+        self.current_save_point()
+            .expect("start() must be called first");
 
-        let next: TokenWrapperOwned<T> = self.next().ok_or_else(||error::ParseError::EOF)?.clone().into();
+        let next: TokenWrapperOwned<T> = self.next()
+            .ok_or_else(||error::ParseError::EOF { expected: Some(vec![tok.clone()]) })?
+            .clone()
+            .into();
 
         if tok == next.token {
             Ok(next)
         } else {
-            self.restore();
-
             Err(error::ParseError::UnexpectedTokenError {
-                expected: Some(tok),
-                range: next.pos.clone(),
+                expected: Some(vec![tok]),
+                pos: next.pos.clone(),
+                unexpected_token: next.into(),
+            })
+        }
+    }
+
+    /// Checks if the next token is as the token given, then return the token; otherwise it will
+    /// call [`LexerWrapper::previous`] to go back.
+    pub fn expect_failsafe(&mut self, tok: T) -> Option<TokenWrapperOwned<T>> {
+        if let Ok(res) = self.expect(tok) { Some(res) } else {
+            self.previous();
+
+            None
+        }
+    }
+
+    /// Expects if the next token is either of the token specified and return the token; otherwise
+    /// it will return a [`error::ParseError::UnexpectedTokenError`]
+    pub fn expect_multiple_choices(&mut self, tokens: Vec<T>)
+        -> Result<TokenWrapperOwned<T>, error::ParseError<T, TokenWrapperOwned<T>>> {
+        self.current_save_point()
+            .expect("start() must be called first");
+
+        let next: TokenWrapperOwned<T> = self.next()
+            .ok_or_else(||error::ParseError::EOF { expected: Some(tokens.clone()) })?
+            .clone()
+            .into();
+
+        if tokens.contains(&next.token) {
+            Ok(next)
+        } else {
+            Err(error::ParseError::UnexpectedTokenError {
+                expected: Some(tokens),
+                pos: next.pos.clone(),
                 unexpected_token: next.into(),
             })
         }
@@ -133,27 +170,35 @@ impl<'source, T> LexerWrapper<'source, T>
     pub fn not_expect(&mut self, tok: T)
         -> Result<TokenWrapperOwned<T>, error::ParseError<T, TokenWrapperOwned<T>>> {
 
-        let next: TokenWrapperOwned<T> = self.next().ok_or_else(||error::ParseError::EOF)?.clone().into();
+        self.current_save_point()
+            .expect("start() must be called first");
+
+        let next: TokenWrapperOwned<T> = self.next()
+            .ok_or_else(||error::ParseError::EOF { expected: None })?
+            .clone()
+            .into();
 
         if tok != next.token {
             Ok(next)
         } else {
-            self.restore();
-
             Err(error::ParseError::UnexpectedTokenError {
                 expected: None,
-                range: next.pos.clone(),
+                pos: next.pos.clone(),
                 unexpected_token: next.into(),
             })
         }
     }
 
-    pub fn previous(&mut self) -> Option<&T> {
+    /// Go back one token, will use the cached token.
+    ///
+    /// Will panic if previous gets called after a [`success()`] (it removes all the cache before
+    /// it)
+    pub fn previous(&mut self) -> Option<&TokenWrapper<T>> {
         let state_start_point = self.current_save_point()
             .expect("start() must be called first");
 
         // check if it's trying to get the token before its save point
-        if self.index - 1 < *state_start_point {
+        if self.index - 1 < *state_start_point || self.index - 1 < self.cache_start_point {
             panic!("trying to access tokens out of bounds");
         }
 
@@ -161,10 +206,42 @@ impl<'source, T> LexerWrapper<'source, T>
         self.index -= 1;
 
         self.cached_tokens.get(self.index - self.cache_start_point)
-            .map(|c| &c.token)
     }
 
-    /// Restores the LexerWrapper into the previous save point
+    /// Peeks one token ahead. Basically does [`next()`] and then [`previous()`].
+    pub fn peek(&mut self) -> Option<TokenWrapperOwned<T>> {
+        self.current_save_point()
+            .expect("start() must be called first");
+
+        let next = self.next()?.clone().into();
+        self.previous();
+
+        Some(next)
+    }
+
+    /// Peeks one token ahead, and expects a token.
+    pub fn expect_peek(&mut self, tok: T)
+        -> Result<TokenWrapperOwned<T>, error::ParseError<T, TokenWrapperOwned<T>>> {
+
+        let res = self.expect(tok)?;
+        let _ = self.previous().unwrap();
+
+        Ok(res)
+    }
+
+    /// Peeks one token ahead, and not expect a token.
+    pub fn not_expect_peek(&mut self, tok: T)
+                       -> Result<TokenWrapperOwned<T>, error::ParseError<T, TokenWrapperOwned<T>>> {
+
+        let res = self.not_expect(tok)?;
+        let _ = self.previous().unwrap();
+
+        Ok(res)
+    }
+
+    /// Restores the LexerWrapper into the previous save point.
+    ///
+    /// Should be called when a rule parser failed to parse but don't want to propagate the error.
     pub fn restore(&mut self) {
         let state_start_point = self.save_points.pop()
             .expect(
@@ -176,7 +253,7 @@ impl<'source, T> LexerWrapper<'source, T>
         self.index = state_start_point;
     }
 
-    /// Removes the current save point and deletes all the cached tokens before the current index
+    /// Removes the current save point and **deletes** all the cached tokens before the current index
     pub fn success(&mut self) {
         self.cached_tokens =
             self.cached_tokens.split_off(self.index - self.cache_start_point - 1);
@@ -195,11 +272,13 @@ pub mod error {
         UnexpectedTokenError {
             expected: Option<Vec<ET>>,
             unexpected_token: UET,
-            range: std::ops::Range<usize>,
+            pos: std::ops::Range<usize>,
         },
 
         // end of file
-        EOF
+        EOF {
+            expected: Option<Vec<ET>>
+        }
     }
 
     impl<ET: Debug, UET: Debug> Debug for ParseError<ET, UET> {
@@ -207,7 +286,7 @@ pub mod error {
             match self {
                 ParseError::UnexpectedTokenError { expected, unexpected_token, .. } => {
                     if let Some(e) = expected {
-                        if e.len() == 0 {
+                        if e.len() == 1 {
                             write!(
                                 f,
                                 "expected token {:?}, got {:?} instead", e.get(0), unexpected_token
@@ -227,7 +306,28 @@ pub mod error {
                         write!(f, "unexpected token {:?}", unexpected_token)
                     }
                 },
-                ParseError::EOF => write!(f, "reached end-of-file")
+                ParseError::EOF { expected } => {
+                    if let Some(expected) = expected {
+                        if expected.len() == 1 {
+                            write!(
+                                f,
+                                "expected token {:?}, but reached end-of-file",
+                                expected.get(0)
+                            )
+                        } else {
+                            write!(
+                                f,
+                                "expected a {}, but reached end-of-file",
+                                expected.iter()
+                                    .fold(String::new(), |acc, tok| {
+                                        format!("{:?} or", tok)
+                                    })[..3].to_string(), // removes the trailing ` or`
+                            )
+                        }
+                    } else {
+                        write!(f, "reached end-of-file")
+                    }
+                }
             }
         }
     }
