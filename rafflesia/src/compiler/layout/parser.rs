@@ -1,7 +1,6 @@
-use anyhow::Result;
 use std::collections::HashMap;
 use logos::Logos;
-use logos_iter::{PeekableLexer, LogosIter};
+use crate::compiler::parser::LexerWrapper;
 
 #[derive(Debug, PartialEq)]
 pub struct View {
@@ -11,8 +10,8 @@ pub struct View {
     pub view_id: Option<String>,
 }
 
-pub fn parse_layout(raw: &str) -> Result<View> {
-    let mut lex: PeekableLexer<'_, _, Token> = Token::lexer(raw).peekable_lexer();
+pub fn parse_layout(raw: &str) -> Result<View, parser::LayoutParseError> {
+    let mut lex: LexerWrapper<'_, Token> = LexerWrapper::new(Token::lexer(raw));
 
     // parse it :sunglasses:
     parser::view(&mut lex)
@@ -52,41 +51,33 @@ pub enum Token {
 
 mod parser {
     use std::collections::HashMap;
-    use anyhow::{Result, bail, Context};
-    use logos_iter::{LogosIter, PeekableLexer};
+    use crate::compiler::parser::{error, LexerWrapper, TokenWrapper, TokenWrapperOwned};
     use super::Token;
     use super::View;
 
+    pub type LayoutParseError = error::ParseError<Token, TokenWrapperOwned<Token>>;
+
     // this signature is ridiculous
-    pub fn view<'a, L>(lexer: &mut PeekableLexer<'a, L, Token>) -> Result<View>
-    where L: LogosIter<'a, Token> {
+    pub fn view(lexer: &mut LexerWrapper<Token>) -> Result<View, LayoutParseError> {
         // todo: better error handling, see ariadne
+        lexer.start();
 
         // view starts with a text as its name
-        let name = if let Token::Text = lexer.next().context("expected a text at the begining of view")? {
-            lexer.slice().to_string()
-        } else {
-            bail!("token is not text {:?}", lexer.span());
-        };
-
-        let attributes = if let Some(Token::LParentheses) = lexer.peek() {
-            Some(attributes(lexer).context("Failed to parse attributes")?)
+        let name = lexer.expect(Token::Text)?.slice;
+        let attributes = if lexer.expect_peek(Token::LParentheses).is_ok() {
+            Some(attributes(lexer)?)
         } else { None };
 
-        let children = if let Some(Token::LBrace) = lexer.peek() {
+        let children = if lexer.expect_peek(Token::LBrace).is_ok() {
             // need box because `View` is Sized
-            Some(Box::new(children(lexer).context("Failed to parse children")?))
+            Some(Box::new(children(lexer)?))
         } else { None };
 
-        let view_id = if let Some(Token::Colon) = lexer.peek() {
-            let _ = lexer.next();
-
-            if let Token::Text = lexer.next().context("expected a text as id after colon")? {} else {
-                bail!("expected a text as id after colon, got `{}` instead", lexer.slice());
-            }
-
-            Some(lexer.slice().to_string())
+        let view_id = if lexer.expect_failsafe(Token::Colon).is_some() {
+            Some(lexer.expect(Token::Text)?.slice.to_string())
         } else { None };
+
+        lexer.success();
 
         Ok(View {
             name,
@@ -96,110 +87,109 @@ mod parser {
         })
     }
 
-    pub fn attributes<'a, L>(lexer: &mut PeekableLexer<'a, L, Token>) -> Result<HashMap<String, String>>
-        where L: LogosIter<'a, Token> {
+    pub fn attributes(lexer: &mut LexerWrapper<Token>)
+        -> Result<HashMap<String, String>, LayoutParseError> {
 
-        if let Some(Token::LParentheses) = lexer.next() {} else {
-            bail!("expected a left parentheses `(`, got `{}` instead", lexer.slice());
-        }
+        lexer.start();
+        lexer.expect(Token::LParentheses)?;
 
         let mut result = HashMap::new();
 
-        if let Some(Token::RParentheses) = lexer.peek() {
-            let _ = lexer.next();
-
-            // welp i guess theres nothing here
+        if lexer.expect_failsafe(Token::RParentheses).is_some() {
+            // welp I guess theres nothing here
             return Ok(result);
         }
 
         // if its not closed then there must be an attribute
-        let first = attribute(lexer).context("Failed to parse attribute")?;
+        let first = attribute(lexer)?;
         result.insert(first.0, first.1);
 
-        while let Some(Token::Comma) = lexer.peek() {
-            let _ = lexer.next();
-
+        while lexer.expect_failsafe(Token::Comma).is_some() {
             // check if next is a closing parentheses, means this is a trailing comma
-            if let Some(Token::RParentheses) = lexer.peek() { break; }
+            if lexer.expect_peek(Token::RParentheses).is_ok() { break; }
 
             // parse attribute
-            let attr = attribute(lexer).context("Failed to parse attribute")?;
+            let attr = attribute(lexer)?;
             result.insert(attr.0, attr.1);
         }
 
         // not a comma, must be a closing parentheses
-        if let Some(Token::RParentheses) = lexer.next() {} else {
-            bail!("expected a closing parentheses, got `{}` instead", lexer.slice());
-        }
+        lexer.expect(Token::RParentheses)?;
+        lexer.success();
 
         Ok(result)
     }
 
-    pub fn attribute<'a, L>(lexer: &mut PeekableLexer<'a, L, Token>) -> Result<(String, String)>
-        where L: LogosIter<'a, Token> {
+    pub fn attribute(lexer: &mut LexerWrapper<Token>)
+        -> Result<(String, String), LayoutParseError> {
+        lexer.start();
 
-        let attr = value(lexer).context("Failed to parse attribute name")?;
+        // attr: value
+        let attr = value(lexer)?;
+        lexer.expect(Token::Colon)?;
+        let value = value(lexer)?;
 
-        // expect a colon
-        if let Some(Token::Colon) = lexer.next() {} else {
-            bail!("expected a colon, got `{}` instead", lexer.slice());
-        }
-
-        let value = value(lexer).context("Failed to parse attribute value")?;
-
+        lexer.success();
         Ok((attr, value))
     }
 
-    pub fn value<'a, L>(lexer: &mut PeekableLexer<'a, L, Token>) -> Result<String>
-        where L: LogosIter<'a, Token> {
+    pub fn value(lexer: &mut LexerWrapper<Token>) -> Result<String, LayoutParseError> {
+        lexer.start();
 
-        Ok(match lexer.next() {
-            Some(Token::Text) => lexer.slice().to_string(),
-            Some(Token::String) => {
-                let string: &str = lexer.slice();
+        let res = match lexer.next() {
+            Some(TokenWrapper { token: Token::Text, slice, .. }) => Ok(slice.to_string()),
+            Some(TokenWrapper { token: Token::String, slice, .. }) =>
+                /* remove the `"` around it */
+                Ok(slice[1..slice.len() - 1].to_string()),
 
-                // remove the `"` around it
-                string[1..string.len() - 1].to_string()
+            // other tokens
+            Some(tok) => {
+                let cloned_tok = tok.clone();
+                return Err(error::ParseError::UnexpectedTokenError {
+                    expected: Some(vec![Token::Text, Token::String]),
+                    pos: cloned_tok.pos.clone(),
+                    unexpected_token: cloned_tok.into()
+                })
             },
-            None => bail!("expected a text or a string"),
-            _ => bail!("expected a text or a string, got `{}` instead", lexer.slice())
-        })
+            None => {
+                return Err(error::ParseError::EOF {
+                    expected: Some(vec![Token::Text, Token::String])
+                })
+            },
+        };
+
+        lexer.success();
+        res
     }
 
-    pub fn children<'a, L>(lexer: &mut PeekableLexer<'a, L, Token>) -> Result<Vec<View>>
-        where L: LogosIter<'a, Token> {
+    pub fn children(lexer: &mut LexerWrapper<Token>) -> Result<Vec<View>, LayoutParseError> {
+        lexer.start();
 
         let mut result = Vec::new();
 
         // expect an opening brace
-        if let Some(Token::LBrace) = lexer.next() {} else {
-            bail!("expected an opening brace, got `{}` instead", lexer.slice());
-        }
+        lexer.expect(Token::LBrace)?;
 
         // check if it already ended :l
-        if let Some(Token::RBrace) = lexer.peek() {
-            let _ = lexer.next();
+        if lexer.expect_failsafe(Token::RBrace).is_some() {
             // welp i guess theres nothing here
             return Ok(result);
         }
 
-        let first = view(lexer).context("Failed parsing the first child")?;
+        let first = view(lexer)?;
         result.push(first);
 
-        while let Some(Token::Comma) = lexer.peek() {
-            let _ = lexer.next();
-
+        while lexer.expect_failsafe(Token::Comma).is_some() {
             // check if next is a closing brace, means this is a trailing comma
-            if let Some(Token::RBrace) = lexer.peek() { break; }
+            if lexer.expect_peek(Token::RBrace).is_ok() { break; }
 
             // parse child
-            result.push(view(lexer).context("Failed to parse child")?);
+            result.push(view(lexer)?);
         }
 
-        if let Some(Token::RBrace) = lexer.next() {} else {
-            bail!("expected a closing brace, got `{}` instead", lexer.slice());
-        }
+        lexer.expect(Token::RBrace)?;
 
+        lexer.success();
         Ok(result)
     }
 }
