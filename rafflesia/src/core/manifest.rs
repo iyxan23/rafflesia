@@ -67,7 +67,6 @@ pub struct FirebaseLibraryTable {
 #[serde(rename_all = "kebab-case")]
 pub struct AdMobLibraryTable {
     pub enabled: bool,
-    pub api_key: String,
     pub test_devices: Vec<String>
 }
 
