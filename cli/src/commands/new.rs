@@ -33,7 +33,7 @@ pub fn exec(args: &ArgMatches) -> Result<()> {
     let version_code = input("Version code?", "1")?.parse()?;
     let version_name = input("Version name?", "1.0")?;
 
-    let palette = if input("Use default colors? [yes/no]", "no")? == "yes" {
+    let palette = if input("Use default colors? [yes/no]", "yes")? == "no" {
         println!(" [!] Write colors as hex codes without the hash symbol (#) and transparency is optional; for instance, 008dcd and ff008dcd are the same thing.");
 
         let primary = input("colorPrimary: ", "ff008dcd")?;
