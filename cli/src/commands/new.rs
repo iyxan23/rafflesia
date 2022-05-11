@@ -36,11 +36,11 @@ pub fn exec(args: &ArgMatches) -> Result<()> {
     let palette = if input("Use default colors? [yes/no]", "yes")? == "no" {
         println!(" [!] Write colors as hex codes without the hash symbol (#) and transparency is optional; for instance, 008dcd and ff008dcd are the same thing.");
 
-        let primary = input("colorPrimary: ", "ff008dcd")?;
-        let primary_dark = input("colorPrimaryDark: ", "ff0084c2")?;
-        let accent = input("colorAccent: ", "ff008dcd")?;
-        let control_normal = input("colorControlNormal: ", "ff57beee")?;
-        let control_highlight = input("colorControlHighlight: ", "20008dcd")?;
+        let primary = input("colorPrimary:", "ff008dcd")?;
+        let primary_dark = input("colorPrimaryDark:", "ff0084c2")?;
+        let accent = input("colorAccent:", "ff008dcd")?;
+        let control_normal = input("colorControlNormal:", "ff57beee")?;
+        let control_highlight = input("colorControlHighlight:", "20008dcd")?;
 
         ColorsTable { primary, primary_dark, accent, control_normal, control_highlight }
     } else {
