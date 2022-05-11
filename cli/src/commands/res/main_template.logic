@@ -1,0 +1,14 @@
+//
+// Default generated rafflesia project
+//
+
+number counter = 0
+
+onCreate {
+    toast("Hey welcome!")
+}
+
+addOneButton.onClick {
+    counter = counter + 1
+    counterText.setText("Counter: ".join(counter.toString()))
+}

@@ -1,0 +1,8 @@
+LinearLayout (
+    layout_height: match_parent,
+    layout_width: match_parent,
+    gravity: center
+) {
+    TextView (text: "Counter: 0"): counterText,
+    Button (text: "Add one"): addOneButton,
+}
