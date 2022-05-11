@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use logos::Logos;
 use crate::compiler::parser::LexerWrapper;
 
 #[derive(Debug, PartialEq)]
@@ -11,49 +10,49 @@ pub struct View {
 }
 
 pub fn parse_layout(raw: &str) -> Result<View, parser::LayoutParseError> {
-    let mut lex: LexerWrapper<'_, Token> = LexerWrapper::new(Token::lexer(raw));
+    let mut lex: LexerWrapper<'_, parser::Token> = LexerWrapper::new(parser::Token::lexer(raw));
 
     // parse it :sunglasses:
     parser::view(&mut lex)
 }
 
-#[derive(Logos, PartialEq, Debug, Clone)]
-pub enum Token {
-    #[token("(")]
-    LParentheses,
-
-    #[token(")")]
-    RParentheses,
-
-    #[token("{")]
-    LBrace,
-
-    #[token("}")]
-    RBrace,
-
-    #[token(":")]
-    Colon,
-
-    #[token(",")]
-    Comma,
-
-    #[regex("[a-zA-Z_]+")]
-    Text,
-
-    #[regex(r#""([^"]|\\")*""#)]
-    String,
-
-    #[error]
-    #[regex(r"[ \n\t]+", logos::skip)] // whitespace
-    #[regex(r"//[^\n]*\n?", logos::skip)] // comment
-    Error,
-}
-
 mod parser {
     use std::collections::HashMap;
     use crate::compiler::parser::{error, LexerWrapper, TokenWrapper, TokenWrapperOwned};
-    use super::Token;
     use super::View;
+    use logos::Logos;
+
+    #[derive(Logos, PartialEq, Debug, Clone)]
+    pub enum Token {
+        #[token("(")]
+        LParentheses,
+
+        #[token(")")]
+        RParentheses,
+
+        #[token("{")]
+        LBrace,
+
+        #[token("}")]
+        RBrace,
+
+        #[token(":")]
+        Colon,
+
+        #[token(",")]
+        Comma,
+
+        #[regex("[a-zA-Z_]+")]
+        Text,
+
+        #[regex(r#""([^"]|\\")*""#)]
+        String,
+
+        #[error]
+        #[regex(r"[ \n\t]+", logos::skip)] // whitespace
+        #[regex(r"//[^\n]*\n?", logos::skip)] // comment
+        Error,
+    }
 
     pub type LayoutParseError = error::ParseError<Token, TokenWrapperOwned<Token>>;
 
