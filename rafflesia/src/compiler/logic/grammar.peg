@@ -18,12 +18,12 @@ list-declaration        = "list" "<" primitive-types ">" identifier
 map-declaration         = "map" "<" primitive-types ">" identifier
 variable-declaration    = primitive-types identifier ("=" expression)?
 
-primitive-types         = "number" | "string"
+primitive-types         = "number" | "string" | "boolean"
 
 event                   = identifier ("." identifier)? "{" inner-statements "}"
 
 inner-statements        = ("\n"+ inner-statement "\n"+)* "\n"*
-inner-statement         = simple-statements | compound-statements
+inner-statement         = compound-statements | simple-statements
 
 simple-statements       = variable-assignment |
                           if-statement |

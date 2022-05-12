@@ -182,6 +182,17 @@ impl<'source, T> LexerWrapper<'source, T>
         }
     }
 
+    /// Peeks and expects if the next token is either of the token specified and return the token;
+    /// otherwise it will return a [`error::ParseError::UnexpectedTokenError`].
+    pub fn expect_peek_multiple_choices(&mut self, tokens: Vec<T>)
+                                   -> Result<TokenWrapperOwned<T>, error::ParseError<T, TokenWrapperOwned<T>>> {
+        trace!("{} - peeking and expecting multiple choices", "  ".repeat(self.save_points.len()));
+
+        let res = self.expect_multiple_choices(tokens);
+        self.previous();
+        res
+    }
+
     /// Opposite of [`LexerWrapper::expect`]
     pub fn not_expect(&mut self, tok: T)
         -> Result<TokenWrapperOwned<T>, error::ParseError<T, TokenWrapperOwned<T>>> {
