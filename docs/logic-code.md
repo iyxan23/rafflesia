@@ -65,6 +65,7 @@ Here you define variables by their type, and then their name.
 ```text
 number myNum
 string myStr
+boolean myBool
 ```
 
 For complex types like maps and lists that can store multiple other types, you will need to specify another type.
@@ -79,6 +80,7 @@ map<string> names    // a map of strings
 The types we have on rafflesia are only 4:
  - `number`: A number
  - `string`: A text
+ - `boolean`: A boolean, `true` or `false`
  - `list<...>`: A list of something
  - `map<...>`: A map of something
 
