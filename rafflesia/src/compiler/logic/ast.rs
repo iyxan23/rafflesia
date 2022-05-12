@@ -51,31 +51,96 @@ pub enum InnerStatement {
 
     IfStatement {
         condition: Expression,
-        statements: InnerStatements,
+        body: InnerStatements,
     },
 
     IfElseStatement {
         condition: Expression,
-        statements: InnerStatements,
-        else_statements: InnerStatements,
+        body: InnerStatements,
+        else_body: InnerStatements,
     },
 
     RepeatStatement {
         value: Expression,
-        statements: InnerStatements,
+        body: InnerStatements,
     },
 
     ForeverStatement {
-        statements: InnerStatements,
+        body: InnerStatements,
     },
 
     Break,
     Continue,
-
-    // todo: Expression?
+    Expression(Expression)
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct Expression {
-    // todo
+pub enum BinaryOperator {
+    Or,
+    And,
+    LT,
+    LTE,
+    GT,
+    GTE,
+    EQ,
+    Plus,
+    Minus,
+    Multiply,
+    Divide,
+    Power,
 }
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum UnaryOperator {
+    Not,
+    Minus,
+    Plus,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum Expression {
+    BinOp {
+        first: Box<Expression>,
+        operator: BinaryOperator,
+        second: Box<Expression>,
+    },
+    UnaryOp {
+        value: Box<Expression>,
+        operator: UnaryOperator
+    },
+    PrimaryExpression(PrimaryExpression),
+    Literal(Literal)
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum Literal {
+    Number(f64),
+    Boolean(bool),
+    String(String),
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum PrimaryExpression {
+    // from[index]
+    Index {
+        from: Box<PrimaryExpression>,
+        index: Box<Expression>,
+    },
+    VariableAccess {
+        // from.name if Some
+        // fixme: there's a better approach to this
+        from: Option<Box<PrimaryExpression>>,
+        name: String,
+    },
+    // name(arguments)
+    FunctionCall {
+        // from.name(arguments) if Some
+        // fixme: there's a better approach to this
+        from: Option<Box<PrimaryExpression>>,
+        name: String,
+        arguments: Arguments
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct Arguments(pub Vec<Expression>);
