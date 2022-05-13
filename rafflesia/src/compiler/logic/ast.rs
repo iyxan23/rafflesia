@@ -18,7 +18,8 @@ pub struct OuterStatements(pub Vec<OuterStatement>);
 pub enum OuterStatement {
     SimpleVariableDeclaration {
         variable_type: VariableType,
-        initial_value: Option<Expression>,
+        // for later
+        // initial_value: Option<Expression>,
         identifier: String,
     },
 
