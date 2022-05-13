@@ -1,3 +1,4 @@
+use logos::Logos;
 use std::collections::HashMap;
 use crate::compiler::parser::LexerWrapper;
 
@@ -202,6 +203,8 @@ mod test {
         let input =
 r#"LinearLayout (hello: "world") {
     TextView (text: hi): myText,
+
+    // ignore this comment!
     TextView (
         "another": "text",
         trailing: comma,
