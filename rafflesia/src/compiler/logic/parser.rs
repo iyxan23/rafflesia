@@ -86,8 +86,17 @@ fn outer_statements(lex: &mut Lexer) -> LogicParseResult<OuterStatements> {
         // skip any newlines
         while let Some(_) = lex.expect_failsafe(Token::Newline) {}
 
-        // check if we've reached the end (no more tokens)
-        if let None = lex.peek() { break; }
+        // break if we've reached EOF, but propagate lexer errors
+        match lex.peek() {
+            Err(err) => {
+                match err {
+                    ParseError::EOF { .. } => break,
+                    ParseError::LexerError { .. } => return Err(err),
+                    _ => unreachable!()
+                }
+            }
+            _ => ()
+        }
 
         statements.0.push(outer_statement(lex)?);
     }

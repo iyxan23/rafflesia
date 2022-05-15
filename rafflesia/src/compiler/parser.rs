@@ -44,6 +44,8 @@ pub struct LexerWrapper<'source, T: Logos<'source> + Debug + Clone + PartialEq>
 
     save_points: Vec<usize>,
     index: usize,
+
+    err_tok: T
 }
 
 impl<'source, T> LexerWrapper<'source, T>
@@ -51,7 +53,7 @@ impl<'source, T> LexerWrapper<'source, T>
         T: Logos<'source> + Debug + Clone + PartialEq,
         <<T as Logos<'source>>::Source as Source>::Slice: AsRef<str> {
 
-    pub fn new(inner: Lexer<'source, T>) -> LexerWrapper<'source, T> {
+    pub fn new(inner: Lexer<'source, T>, err_tok: T) -> LexerWrapper<'source, T> {
         LexerWrapper {
             inner,
             cached_tokens: Vec::new(),
@@ -59,6 +61,7 @@ impl<'source, T> LexerWrapper<'source, T>
             inner_index: 0,
             save_points: vec![0],
             index: 0,
+            err_tok
         }
     }
 
@@ -77,7 +80,10 @@ impl<'source, T> LexerWrapper<'source, T>
     }
 
     /// Gets the next token, if cached it will use the cache instead.
-    pub fn next(&mut self) -> Option<&TokenWrapper<T>> {
+    ///
+    /// Returns an `Err` when either it reaches EOF ([`error::ParseError::EOF`]) or when it
+    /// encounters an Error token ([`error::ParseError::LexerError`]).
+    pub fn next(&mut self) -> Result<&TokenWrapper<T>, error::ParseError<T, TokenWrapperOwned<T>>> {
         // it's not _really_ necessary to get the current save point,
         // it's only for the sake of consistency
         self.current_save_point()
@@ -86,7 +92,18 @@ impl<'source, T> LexerWrapper<'source, T>
         // check if the next token is not already cached
         if self.index >= self.inner_index {
             // yep, this is up-to-date! go next and save it to the cache
-            let next_token = self.inner.next()?; // will return None if there is none left
+            let next_token = self.inner.next()
+                .ok_or_else(|| error::ParseError::EOF { expected: None })?;
+
+            // check if this is an error token
+            if self.err_tok == next_token {
+                // welp return ParseError::LexerError
+                return Err(error::ParseError::LexerError {
+                    err_token: next_token,
+                    pos: self.inner.span(),
+                    slice: self.inner.slice().as_ref().to_string(),
+                })
+            }
 
             self.cached_tokens.push(TokenWrapper {
                 token: next_token,
@@ -94,21 +111,23 @@ impl<'source, T> LexerWrapper<'source, T>
                 pos: self.inner.span(),
             });
 
-            let ret = self.cached_tokens.get(self.index - self.cache_start_point);
+            let ret = self.cached_tokens.get(self.index - self.cache_start_point)
+                .ok_or_else(|| error::ParseError::EOF { expected: None })?;
 
             self.index += 1;
             self.inner_index += 1;
 
             trace!("{}-> next (now {}, inner {}): {:?}", "  ".repeat(self.save_points.len()), self.index, self.inner_index, ret);
-
-            ret
+            Ok(ret)
         } else {
             // nope, get it then
-            let ret = self.cached_tokens.get(self.index - self.cache_start_point);
+            let ret = self.cached_tokens.get(self.index - self.cache_start_point)
+                .ok_or_else(|| error::ParseError::EOF { expected: None })?;
+
             self.index += 1;
 
             trace!("{}-> next [c] (now {}, inner {}): {:?}", "  ".repeat(self.save_points.len()), self.index, self.inner_index, ret);
-            ret
+            Ok(ret)
         }
     }
 
@@ -126,7 +145,7 @@ impl<'source, T> LexerWrapper<'source, T>
             .expect("start() must be called first");
 
         let next: TokenWrapperOwned<T> = self.next()
-            .ok_or_else(||error::ParseError::EOF { expected: Some(vec![tok.clone()]) })?
+            .map_err(|err| err.map_eof_expected(|| vec![tok.clone()]))?
             .clone()
             .into();
 
@@ -147,6 +166,7 @@ impl<'source, T> LexerWrapper<'source, T>
 
     /// Checks if the next token is as the token given, then return the token; otherwise it will
     /// call [`LexerWrapper::previous`] to go back.
+    // fixme: LexerError doesnt get propagated
     pub fn expect_failsafe(&mut self, tok: T) -> Option<TokenWrapperOwned<T>> {
         if let Ok(res) = self.expect(tok) { Some(res) } else {
             self.previous();
@@ -163,7 +183,7 @@ impl<'source, T> LexerWrapper<'source, T>
             .expect("start() must be called first");
 
         let next: TokenWrapperOwned<T> = self.next()
-            .ok_or_else(||error::ParseError::EOF { expected: Some(tokens.clone()) })?
+            .map_err(|err| err.map_eof_expected(|| tokens.clone()))?
             .clone()
             .into();
 
@@ -200,10 +220,7 @@ impl<'source, T> LexerWrapper<'source, T>
         self.current_save_point()
             .expect("start() must be called first");
 
-        let next: TokenWrapperOwned<T> = self.next()
-            .ok_or_else(||error::ParseError::EOF { expected: None })?
-            .clone()
-            .into();
+        let next: TokenWrapperOwned<T> = self.next()?.clone().into();
 
         if tok != next.token {
             trace!("{} - expected {:?} (not expecting {:?})", "  ".repeat(self.save_points.len()), next, tok);
@@ -242,7 +259,9 @@ impl<'source, T> LexerWrapper<'source, T>
     }
 
     /// Peeks one token ahead. Basically does [`next()`] and then [`previous()`].
-    pub fn peek(&mut self) -> Option<TokenWrapperOwned<T>> {
+    pub fn peek(&mut self)
+        -> Result<TokenWrapperOwned<T>, error::ParseError<T, TokenWrapperOwned<T>>> {
+
         self.current_save_point()
             .expect("start() must be called first");
 
@@ -251,7 +270,7 @@ impl<'source, T> LexerWrapper<'source, T>
 
         trace!("{} - peeked {:?}", "  ".repeat(self.save_points.len()), next);
 
-        Some(next)
+        Ok(next)
     }
 
     /// Peeks one token ahead, and expects a token. Then go back no matter what
@@ -327,6 +346,45 @@ pub mod error {
         // end of file
         EOF {
             expected: Option<Vec<ET>>
+        },
+
+        // when the lexer wrapper encounters an Error token
+        LexerError {
+            err_token: ET,
+            pos: std::ops::Range<usize>,
+            slice: String
+        }
+    }
+
+    impl<ET: Debug, UET: Debug> ParseError<ET, UET> {
+        /// Returns whether the error is recoverable (an unexpected token), or is unrecoverable
+        /// (EOF, Error token)
+        pub fn is_recoverable(&self) -> bool {
+            match self {
+                ParseError::UnexpectedTokenError { .. } => true,
+                ParseError::EOF { .. } => false,
+                ParseError::LexerError { .. } => false,
+            }
+        }
+
+        /// Does the same thing as [`ParseError::is_recoverable`], except that EOF returns true.
+        /// Used in situations where EOF might be a sign of an uncomplete rule at the end of the
+        /// file.
+        pub fn is_recoverable_w_eof(&self) -> bool {
+            match self {
+                ParseError::UnexpectedTokenError { .. } => true,
+                ParseError::EOF { .. } => true,
+                ParseError::LexerError { .. } => false,
+            }
+        }
+        
+        /// Maps the `expected` field of [`ParseError::EOF`]
+        pub fn map_eof_expected<F>(self, f: F) -> Self
+        where F: FnOnce() -> Vec<ET> {
+            match self {
+                ParseError::EOF { .. } => ParseError::EOF { expected: Some(f()) },
+                _ => self
+            }
         }
     }
 
@@ -376,6 +434,9 @@ pub mod error {
                     } else {
                         write!(f, "reached end-of-file")
                     }
+                }
+                ParseError::LexerError { err_token, pos, slice } => {
+                    write!(f, "lexer error {:?} at {:?}: `{}`", err_token, pos, slice)
                 }
             }
         }
