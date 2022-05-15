@@ -30,13 +30,13 @@ pub enum OuterStatement {
 
     ActivityEventListener {
         event_name: String,
-        statements: InnerStatements
+        body: InnerStatements
     },
 
     ViewEventListener {
         view_id: String,
         event_name: String,
-        statements: InnerStatements
+        body: InnerStatements
     }
 }
 
@@ -44,32 +44,35 @@ pub enum OuterStatement {
 pub struct InnerStatements(pub Vec<InnerStatement>);
 
 #[derive(Debug, PartialEq, Clone)]
+pub struct VariableAssignment {
+    pub identifier: String,
+    pub value: Expression
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct IfStatement {
+    pub condition: Expression,
+    pub body: InnerStatements,
+    pub else_body: Option<InnerStatements>,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct ForeverStatement {
+    pub body: InnerStatements,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct RepeatStatement {
+    pub condition: Expression,
+    pub body: InnerStatements,
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub enum InnerStatement {
-    VariableAssignment {
-        identifier: String,
-        value: Expression,
-    },
-
-    IfStatement {
-        condition: Expression,
-        body: InnerStatements,
-    },
-
-    IfElseStatement {
-        condition: Expression,
-        body: InnerStatements,
-        else_body: InnerStatements,
-    },
-
-    RepeatStatement {
-        value: Expression,
-        body: InnerStatements,
-    },
-
-    ForeverStatement {
-        body: InnerStatements,
-    },
-
+    VariableAssignment(VariableAssignment),
+    IfStatement(IfStatement),
+    RepeatStatement(RepeatStatement),
+    ForeverStatement(ForeverStatement),
     Break,
     Continue,
     Expression(Expression)
@@ -133,12 +136,10 @@ pub enum PrimaryExpression {
         from: Option<Box<PrimaryExpression>>,
         name: String,
     },
-    // name(arguments)
-    FunctionCall {
-        // from.name(arguments) if Some
-        // fixme: there's a better approach to this
-        from: Option<Box<PrimaryExpression>>,
-        name: String,
+    // calling a VariableAccess with arguments
+    Call {
+        // from(arguments)
+        from: Box<PrimaryExpression>,
         arguments: Arguments
     }
 }

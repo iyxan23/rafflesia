@@ -1,6 +1,7 @@
 use anyhow::Result;
 use crate::compiler::parser::{error, LexerWrapper, TokenWrapperOwned};
 use logos::Logos;
+use crate::compiler::parser::error::ParseError;
 use super::ast::*;
 
 pub fn parse_logic(raw: &str) -> Result<OuterStatements> {
@@ -77,6 +78,8 @@ pub enum Token {
 pub type LogicParseError = error::ParseError<Token, TokenWrapperOwned<Token>>;
 pub type LogicParseResult<T> = Result<T, LogicParseError>;
 type Lexer<'a> = LexerWrapper<'a, Token>;
+
+// todo: a "block" rule for `{ ... }`
 
 fn outer_statements(lex: &mut Lexer) -> LogicParseResult<OuterStatements> {
     lex.start();
@@ -218,7 +221,7 @@ fn outer_event_definition(lex: &mut Lexer) -> LogicParseResult<OuterStatement> {
         Ok(OuterStatement::ViewEventListener {
             view_id: name,
             event_name,
-            statements
+            body: statements
         })
 
     } else {
@@ -230,17 +233,126 @@ fn outer_event_definition(lex: &mut Lexer) -> LogicParseResult<OuterStatement> {
 
         lex.expect(Token::RBrace)?;
 
+        lex.success();
         Ok(OuterStatement::ActivityEventListener {
             event_name: name,
-            statements,
+            body: statements,
         })
     }
 }
 
 fn inner_statements(lex: &mut Lexer) -> LogicParseResult<InnerStatements> {
-    todo!()
+    lex.start();
+    let mut statements = InnerStatements(vec![]);
+
+    loop {
+        // skip any newlines
+        while let Some(_) = lex.expect_failsafe(Token::Newline) {}
+
+        // check if we've reached the end (a closing brace)
+        // todo: change this when there's an Error token detection in LexerWrapper
+        if let Ok(_) = lex.expect_peek(Token::RBrace) { break; }
+
+        statements.0.push(inner_statement(lex)?);
+    }
+
+    lex.success();
+    Ok(statements)
 }
 
 fn inner_statement(lex: &mut Lexer) -> LogicParseResult<InnerStatement> {
+    lex.start();
+
+    let res = match lex.expect_multiple_choices(
+        vec![Token::Identifier, Token::If, Token::Repeat, Token::Forever]
+    )? {
+        TokenWrapperOwned { token: Token::Identifier, .. } =>
+            InnerStatement::VariableAssignment(variable_assignment(lex)?),
+        TokenWrapperOwned { token: Token::If, .. } =>
+            InnerStatement::IfStatement(if_statement(lex)?),
+        TokenWrapperOwned { token: Token::Repeat, .. } =>
+            InnerStatement::RepeatStatement(repeat_statement(lex)?),
+        TokenWrapperOwned { token: Token::Forever, .. } =>
+            InnerStatement::ForeverStatement(forever_statement(lex)?),
+
+        TokenWrapperOwned { token: Token::Break, .. } => InnerStatement::Break,
+        TokenWrapperOwned { token: Token::Continue, .. } => InnerStatement::Continue,
+
+        // todo: figure out how to fit expressions in here
+
+        _ => unreachable!()
+    };
+
+    lex.success();
+    Ok(res)
+}
+
+fn variable_assignment(lex: &mut Lexer) -> LogicParseResult<VariableAssignment> {
+    lex.start();
+
+    // ident = expr
+    let identifier = lex.expect(Token::Identifier)?.slice;
+    lex.expect(Token::EQ);
+    let value = expression(lex)?;
+
+    lex.success();
+    Ok(VariableAssignment { identifier, value })
+}
+
+fn if_statement(lex: &mut Lexer) -> LogicParseResult<IfStatement> {
+    lex.start();
+
+    // if expr { inner_statements }
+    lex.expect(Token::If)?;
+    let condition = expression(lex)?;
+
+    lex.expect(Token::LBrace)?;
+    let body = inner_statements(lex)?;
+    lex.expect(Token::RBrace)?;
+
+    // check if there is an else
+    let else_body = if let Some(_) = lex.expect_failsafe(Token::Else) {
+        lex.expect(Token::LBrace)?;
+        let else_body = inner_statements(lex)?;
+        lex.expect(Token::RBrace)?;
+
+        Some(else_body)
+    } else { None };
+
+    Ok(IfStatement {
+        condition,
+        body,
+        else_body,
+    })
+}
+
+fn repeat_statement(lex: &mut Lexer) -> LogicParseResult<RepeatStatement> {
+    lex.start();
+
+    lex.expect(Token::Repeat)?;
+    let condition = expression(lex)?;
+
+    lex.expect(Token::LBrace)?;
+    let body = inner_statements(lex)?;
+    lex.expect(Token::RBrace)?;
+
+    lex.success();
+    Ok(RepeatStatement { condition, body })
+}
+
+fn forever_statement(lex: &mut Lexer) -> LogicParseResult<ForeverStatement> {
+    lex.start();
+
+    lex.expect(Token::Forever)?;
+
+    lex.expect(Token::LBrace);
+    let body = inner_statements(lex)?;
+    lex.expect(Token::RBrace);
+
+    lex.success();
+    Ok(ForeverStatement { body })
+}
+
+fn expression(lex: &mut Lexer) -> LogicParseResult<Expression> {
     todo!()
 }
