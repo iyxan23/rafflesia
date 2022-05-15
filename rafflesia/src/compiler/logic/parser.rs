@@ -345,9 +345,9 @@ fn forever_statement(lex: &mut Lexer) -> LogicParseResult<ForeverStatement> {
 
     lex.expect(Token::Forever)?;
 
-    lex.expect(Token::LBrace);
+    lex.expect(Token::LBrace)?;
     let body = inner_statements(lex)?;
-    lex.expect(Token::RBrace);
+    lex.expect(Token::RBrace)?;
 
     lex.success();
     Ok(ForeverStatement { body })
