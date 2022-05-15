@@ -1,5 +1,6 @@
 use logos::Logos;
 use std::collections::HashMap;
+use crate::compiler::layout::parser::parser::Token;
 use crate::compiler::parser::LexerWrapper;
 
 #[derive(Debug, PartialEq)]
@@ -11,7 +12,8 @@ pub struct View {
 }
 
 pub fn parse_layout(raw: &str) -> Result<View, parser::LayoutParseError> {
-    let mut lex: LexerWrapper<'_, parser::Token> = LexerWrapper::new(parser::Token::lexer(raw));
+    let mut lex: LexerWrapper<'_, Token>
+        = LexerWrapper::new(Token::lexer(raw), Token::Error);
 
     // parse it :sunglasses:
     parser::view(&mut lex)
@@ -64,15 +66,24 @@ mod parser {
 
         // view starts with a text as its name
         let name = lexer.expect(Token::Text)?.slice;
-        let attributes = if lexer.expect_peek(Token::LParentheses).is_ok() {
-            Some(attributes(lexer)?)
-        } else { None };
 
-        let children = if lexer.expect_peek(Token::LBrace).is_ok() {
-            // need box because `View` is Sized
-            Some(Box::new(children(lexer)?))
-        } else { None };
+        let attributes = lexer
+            .expect_failsafe(Token::LParentheses)
+            .map(|_| {
+                lexer.previous();
+                attributes(lexer)
+            })
+            .transpose()?;
 
+        let children = lexer
+            .expect_failsafe(Token::LBrace)
+            .map(|_| {
+                lexer.previous();
+                Ok(Box::new(children(lexer)?))
+            })
+            .transpose()?;
+
+        // fixme: maybe use a new func for this?
         let view_id = if lexer.expect_failsafe(Token::Colon).is_some() {
             Some(lexer.expect(Token::Text)?.slice.to_string())
         } else { None };
@@ -136,30 +147,19 @@ mod parser {
     pub fn value(lexer: &mut LexerWrapper<Token>) -> Result<String, LayoutParseError> {
         lexer.start();
 
-        let res = match lexer.next() {
-            Some(TokenWrapper { token: Token::Text, slice, .. }) => Ok(slice.to_string()),
-            Some(TokenWrapper { token: Token::String, slice, .. }) =>
+        let res = match lexer.expect_multiple_choices(
+            vec![Token::Text, Token::String]
+        )? {
+            TokenWrapperOwned { token: Token::Text, slice, .. } => slice.to_string(),
+            TokenWrapperOwned { token: Token::String, slice, .. } =>
                 /* remove the `"` around it */
-                Ok(slice[1..slice.len() - 1].to_string()),
+                slice[1..slice.len() - 1].to_string(),
 
-            // other tokens
-            Some(tok) => {
-                let cloned_tok = tok.clone();
-                return Err(error::ParseError::UnexpectedTokenError {
-                    expected: Some(vec![Token::Text, Token::String]),
-                    pos: cloned_tok.pos.clone(),
-                    unexpected_token: cloned_tok.into()
-                })
-            },
-            None => {
-                return Err(error::ParseError::EOF {
-                    expected: Some(vec![Token::Text, Token::String])
-                })
-            },
+            _ => unreachable!()
         };
 
         lexer.success();
-        res
+        Ok(res)
     }
 
     pub fn children(lexer: &mut LexerWrapper<Token>) -> Result<Vec<View>, LayoutParseError> {
