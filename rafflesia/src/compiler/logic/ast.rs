@@ -127,19 +127,19 @@ pub enum Literal {
 pub enum PrimaryExpression {
     // from[index]
     Index {
-        from: Box<PrimaryExpression>,
+        from: Box<Expression>, // using PrimaryExpression would be better
         index: Box<Expression>,
     },
     VariableAccess {
         // from.name if Some
         // fixme: there's a better approach to this
-        from: Option<Box<PrimaryExpression>>,
+        from: Option<Box<Expression>>, // using PrimaryExpression would be better
         name: String,
     },
     // calling a VariableAccess with arguments
     Call {
         // from(arguments)
-        from: Box<PrimaryExpression>,
+        from: Box<Expression>, // using PrimaryExpression would be better
         arguments: Arguments
     }
 }

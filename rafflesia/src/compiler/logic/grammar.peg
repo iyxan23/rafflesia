@@ -63,8 +63,8 @@ factor                  = "+" factor |
                           "-" factor |
                           power
 
-power                   = primary "**" factor |
-                          primary
+// right precedence
+power                   = primary ("**" power)?
 
 primary                 = primary "." identifier |
                           primary "(" arguments? ")" |
@@ -76,6 +76,5 @@ arguments               = expression ("," expression)* ","? # trailing comma
 atom                    = identifier |
                           "true" |
                           "false" |
-                          "null" |
                           string |
                           number

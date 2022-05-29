@@ -81,6 +81,10 @@ type Lexer<'a> = LexerWrapper<'a, Token>;
 
 // todo: a "block" rule for `{ ... }`
 
+// A note before you read all this: I have no idea about parser stuff; so if you do know about it,
+// please tell me what is your approach to doing this, I feel like there's a waaay better way
+// of doing this.
+
 fn outer_statements(lex: &mut Lexer) -> LogicParseResult<OuterStatements> {
     lex.start();
     let mut statements = OuterStatements(vec![]);
@@ -292,7 +296,7 @@ fn variable_assignment(lex: &mut Lexer) -> LogicParseResult<VariableAssignment> 
 
     // ident = expr
     let identifier = lex.expect(Token::Identifier)?.slice;
-    lex.expect(Token::EQ);
+    lex.expect(Token::EQ)?;
     let value = expression(lex)?;
 
     lex.success();
@@ -354,5 +358,308 @@ fn forever_statement(lex: &mut Lexer) -> LogicParseResult<ForeverStatement> {
 }
 
 fn expression(lex: &mut Lexer) -> LogicParseResult<Expression> {
-    todo!()
+    lex.start();
+
+    // try to parse boolean expression
+    let bool_expr = error::propagate_non_recoverable_wo_eof!(boolean_expression(lex));
+    if let Ok(expr) = bool_expr {
+        lex.success();
+        return Ok(expr);
+    } else {
+        lex.restore();
+    }
+
+    // try again for atom
+    let atom = error::propagate_non_recoverable_wo_eof!(atom(lex));
+    if let Ok(expr) = atom {
+        lex.success();
+        return Ok(expr);
+    }
+
+    // fixme: i have no idea what to return here, we can't have two different errors to be returned.
+    // i feel like this atom branch is unnecessary since it should already been checked inside the
+    // many call stacks of bool_expr
+    bool_expr
+}
+
+// Generates a match block that converts the given token into a binary operator
+macro_rules! token_to_binop {
+    ($tok_var:ident, { $($tok:ident => $binop:ident),* }) => {
+        match $tok_var {
+            $(TokenWrapperOwned { token: Token::$tok, .. } => BinaryOperator::$binop,)*
+            _ => unreachable!()
+        }
+    };
+}
+
+// todo: DRY on the rules below
+
+fn boolean_expression(lex: &mut Lexer) -> LogicParseResult<Expression> {
+    lex.start();
+    let first_branch = comparison_expression(lex)?;
+    let mut result = first_branch;
+
+    while let Ok(tok) =
+        lex.expect_peek_multiple_choices(vec![Token::Or, Token::And]) {
+
+        // skip the next token because we've peeked it
+        let _ = lex.next();
+
+        let operator = token_to_binop!(tok, { Or => Or, And => And });
+        let second_branch = comparison_expression(lex)?;
+
+        result = Expression::BinOp {
+            first: Box::new(result),
+            operator,
+            second: Box::new(second_branch)
+        };
+    }
+
+    lex.success();
+    Ok(result)
+}
+
+fn comparison_expression(lex: &mut Lexer) -> LogicParseResult<Expression> {
+    lex.start();
+
+    // "!" comparison-expression
+    if lex.expect_failsafe(Token::Not).is_some() {
+        let expr = arithmetic_expression(lex)?;
+
+        lex.success();
+        return Ok(Expression::UnaryOp {
+            value: Box::new(expr),
+            operator: UnaryOperator::Not
+        })
+    }
+
+    let first_branch = arithmetic_expression(lex)?;
+    let mut result = first_branch;
+
+    while let Ok(tok) =
+        lex.expect_peek_multiple_choices(vec![
+            Token::LT, Token::GT, Token::EQ, Token::LTE, Token::GTE
+        ]) {
+
+        // skip the next token because we've peeked it
+        let _ = lex.next();
+
+        let operator = token_to_binop!(tok, {
+            LT => LT,GT => GT, EQ => EQ, LTE => LTE, GTE => GTE
+        });
+
+        let second_branch = comparison_expression(lex)?;
+
+        result = Expression::BinOp {
+            first: Box::new(result),
+            operator,
+            second: Box::new(second_branch)
+        };
+    }
+
+    lex.success();
+    Ok(result)
+}
+
+fn arithmetic_expression(lex: &mut Lexer) -> LogicParseResult<Expression> {
+    lex.start();
+
+    let first_branch = term(lex)?;
+    let mut result = first_branch;
+
+    while let Ok(tok) =
+        lex.expect_peek_multiple_choices(vec![Token::Plus, Token::Minus]) {
+
+        // skip the next token because we've peeked it
+        let _ = lex.next();
+
+        let operator = token_to_binop!(tok, { Plus => Plus, Minus => Minus });
+        let second_branch = term(lex)?;
+
+        result = Expression::BinOp {
+            first: Box::new(result),
+            operator,
+            second: Box::new(second_branch)
+        };
+    }
+
+    lex.success();
+    Ok(result)
+}
+
+fn term(lex: &mut Lexer) -> LogicParseResult<Expression> {
+    lex.start();
+
+    let first_branch = term(lex)?;
+    let mut result = first_branch;
+
+    while let Ok(tok) =
+        lex.expect_peek_multiple_choices(vec![Token::Mult, Token::Div]) {
+
+        // skip the next token because we've peeked it
+        let _ = lex.next();
+
+        let operator = token_to_binop!(tok, { Mult => Multiply, Div => Divide });
+        let second_branch = term(lex)?;
+
+        result = Expression::BinOp {
+            first: Box::new(result),
+            operator,
+            second: Box::new(second_branch)
+        };
+    }
+
+    lex.success();
+    Ok(result)
+}
+
+fn factor(lex: &mut Lexer) -> LogicParseResult<Expression> {
+    lex.start();
+
+    if lex.expect_failsafe(Token::Plus).is_some() {
+        let factor = factor(lex)?;
+
+        lex.success();
+        return Ok(Expression::UnaryOp {
+            value: Box::new(factor),
+            operator: UnaryOperator::Plus
+        })
+    }
+
+    if lex.expect_failsafe(Token::Minus).is_some() {
+        let factor = factor(lex)?;
+
+        lex.success();
+        return Ok(Expression::UnaryOp {
+            value: Box::new(factor),
+            operator: UnaryOperator::Minus
+        })
+    }
+
+    lex.success();
+    power(lex)
+}
+
+fn power(lex: &mut Lexer) -> LogicParseResult<Expression> {
+    lex.start();
+    let primary = primary(lex)?;
+
+    Ok(if lex.expect_failsafe(Token::Pow).is_some() {
+        let power = power(lex)?;
+
+        lex.success();
+        Expression::BinOp {
+            first: Box::new(primary),
+            operator: BinaryOperator::Power,
+            second: Box::new(power)
+        }
+    } else {
+        lex.success();
+        primary
+    })
+}
+
+fn primary(lex: &mut Lexer) -> LogicParseResult<Expression> {
+    lex.start();
+
+    let atom = atom(lex)?;
+    let mut result = atom;
+
+    while let Ok(tok) =
+        lex.expect_peek_multiple_choices(vec![Token::DOT, Token::LBracket, Token::LParen]) {
+
+        // skip the next token because we've peeked it
+        let _ = lex.next();
+
+        match tok {
+            TokenWrapperOwned { token: Token::DOT, .. } => {
+                let ident = lex.expect(Token::Identifier)?;
+
+                result = Expression::PrimaryExpression(PrimaryExpression::VariableAccess {
+                    from: Some(Box::new(result)),
+                    name: ident.slice
+                })
+            }
+            TokenWrapperOwned { token: Token::LBracket, .. } => {
+                let index_expr = expression(lex)?;
+
+                result = Expression::PrimaryExpression(PrimaryExpression::Index {
+                    from: Box::new(result),
+                    index: Box::new(index_expr)
+                })
+            }
+            TokenWrapperOwned { token: Token::LParen, .. } => {
+                let arguments = arguments(lex)?;
+
+                result = Expression::PrimaryExpression(PrimaryExpression::Call {
+                    from: Box::new(result),
+                    arguments
+                })
+            }
+            _ => unreachable!()
+        }
+    }
+
+    lex.success();
+    Ok(result)
+}
+
+fn arguments(lex: &mut Lexer) -> LogicParseResult<Arguments> {
+    lex.start();
+
+    if lex.expect_failsafe(Token::RParen).is_some() {
+        return Ok(Arguments(vec![]));
+    }
+
+    let mut arguments = vec![];
+
+    let first = expression(lex)?;
+    arguments.push(first);
+
+    while lex.expect_failsafe(Token::Comma).is_some() {
+        if lex.expect_peek(Token::RParen).is_ok() { break; }
+        arguments.push(expression(lex)?);
+    }
+
+    Ok(Arguments(arguments))
+}
+
+fn atom(lex: &mut Lexer) -> LogicParseResult<Expression> {
+    lex.start();
+
+    match lex.expect_multiple_choices(
+        vec![Token::Identifier, Token::String, Token::Number, Token::False, Token::True]
+    )? {
+        TokenWrapperOwned { token: Token::Identifier, slice, .. } => {
+            lex.success();
+            Ok(Expression::PrimaryExpression(PrimaryExpression::VariableAccess {
+                from: None,
+                name: slice
+            }))
+        }
+        TokenWrapperOwned { token: Token::String, slice, .. } => {
+            lex.success();
+            Ok(Expression::Literal(Literal::String(slice[1..slice.len()].to_string())))
+        }
+        TokenWrapperOwned { token: Token::Number, slice, pos } => {
+            let num = slice.parse::<f64>()
+                .map_err(|e| ParseError::LexerError {
+                    err_token: Token::Number,
+                    pos: pos.clone(),
+                    slice: slice.to_string(),
+                })?;
+
+            lex.success();
+            Ok(Expression::Literal(Literal::Number(num)))
+        }
+        TokenWrapperOwned { token: Token::False, .. } => {
+            lex.success();
+            Ok(Expression::Literal(Literal::Boolean(false)))
+        }
+        TokenWrapperOwned { token: Token::True, .. } => {
+            lex.success();
+            Ok(Expression::Literal(Literal::Boolean(true)))
+        }
+        _ => unreachable!()
+    }
 }

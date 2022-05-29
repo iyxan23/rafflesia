@@ -356,6 +356,29 @@ pub mod error {
         }
     }
 
+    /// Propagates non recoverable errors (LexerError, and EOF)
+    macro_rules! propagate_non_recoverable {
+        ($rule: expr) => {
+            match $rule {
+                Ok(res) => Ok(res),
+                Err(er) => if !er.is_recoverable() { return Err(er) } else { Err(er) }
+            }
+        };
+    }
+
+    /// Propagates non recoverable errors except for EOF (only propagates LexerError)
+    macro_rules! propagate_non_recoverable_wo_eof {
+        ($rule: expr) => {
+            match $rule {
+                Ok(res) => Ok(res),
+                Err(er) => if !er.is_recoverable_w_eof() { return Err(er) } else { Err(er) }
+            }
+        };
+    }
+
+    pub(crate) use propagate_non_recoverable;
+    pub(crate) use propagate_non_recoverable_wo_eof;
+
     impl<ET: Debug, UET: Debug> ParseError<ET, UET> {
         /// Returns whether the error is recoverable (an unexpected token), or is unrecoverable
         /// (EOF, Error token)
