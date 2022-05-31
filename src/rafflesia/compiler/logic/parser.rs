@@ -4,8 +4,11 @@ use logos::Logos;
 use crate::compiler::parser::error::ParseError;
 use super::ast::*;
 
-pub fn parse_logic(raw: &str) -> Result<OuterStatements> {
-    Ok(todo!())
+pub fn parse_logic(raw: &str) -> LogicParseResult<OuterStatements> {
+    let mut lex: LexerWrapper<'_, Token>
+        = LexerWrapper::new(Token::lexer(raw), Token::Error);
+
+    outer_statements(&mut lex)
 }
 
 #[derive(Logos, PartialEq, Debug, Clone)]

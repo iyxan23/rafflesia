@@ -8,6 +8,7 @@
       <sourceFolder url="file://$MODULE_DIR$/swrs/examples" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/swrs/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/swrs/tests" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>
     <orderEntry type="inheritedJdk" />
