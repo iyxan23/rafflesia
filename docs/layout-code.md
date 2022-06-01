@@ -94,15 +94,55 @@ logic = "main.logic"
 layout = "main.layout"
 ```
 
-### Views list
+### Views and attributes
 
-> todo
+View-independent attributes are:
+ - `height`: value can either be `match_parent`, `wrap_content` or an arbitrary integer that denotes a fixed height in dp
+ - `width`: same as height
+ - `weight`: an integer that sets the weight of the view
+ - `weight_sum`: an integer that sets the weight sum of the view
+ - `layout_gravity`: can be any of:
+   - `center_horizontal`
+   - `center_vertical`
+   - `center`
+   - `left`
+   - `right`
+   - `top`
+   - `bottom`
+     or them combined separated with `|`. e.g. `left|bottom` (spaces are ignored).<br/>
+     Specifying opposite gravity values together (e.g. `left|right`) will result in an error.
+ - `padding`: an integer in dp that sets the padding in all directions
+ - `padding_top`: an integer in dp that sets the padding on the top of the view
+ - `padding_bottom`: an integer in dp that sets the padding on the bottom of the view
+ - `padding_left`: an integer in dp that sets the padding on the left of the view
+ - `padding_right`: an integer in dp that sets the padding on the right of the view
+ - `padding_horizontal`: an integer in dp that sets the padding on the left and right of the view
+ - `padding_vertical`: an integer in dp that sets the padding on the top and bottom of the view
+ - `margin`: an integer in dp that sets the margin in all directions
+ - `margin_top`: an integer in dp that sets the margin on the top of the view
+ - `margin_bottom`: an integer in dp that sets the margin on the bottom of the view
+ - `margin_left`: an integer in dp that sets the margin on the left of the view
+ - `margin_right`: an integer in dp that sets the margin on the right of the view
+ - `margin_horizontal`: an integer in dp that sets the margin on the left and right of the view
+ - `margin_vertical`: an integer in dp that sets the margin on the top and bottom of the view
 
-A list of views (and attributes) that exists in sketchware and are supported by rafflesia are:
+View-specific attributes in sketchware and supported by rafflesia are:
  - <details><summary><code>LinearLayout</code></summary>
    Attributes:
    <ul>
-     <li></li>
+     <li><code>orientation</code>: <code>vertical</code> / <code>horizontal</code></li>
+     <li><code>gravity</code>: can be any of <ul>
+       <li><code>center_horizontal</code></li>
+       <li><code>center_vertical</code></li>
+       <li><code>center</code> (mix of both <code>center_horizontal</code> and <code>center_vertical</code></li>
+       <li><code>left</code></li>
+       <li><code>right</code></li>
+       <li><code>top</code></li>
+       <li><code>bottom</code></li>
+     </ul>
+     or them combined separated with <code>|</code>. e.g: <code>left|bottom</code> (spaces are ignored)<br/>
+     Specifying opposite gravity values together (e.g. <code>left|right</code>) will result in an error.
+     </li>
    </ul>
    </details>
 
