@@ -1,5 +1,5 @@
 use anyhow::Result;
-use crate::compiler::parser::{error, LexerWrapper, TokenWrapperOwned};
+use crate::compiler::parser::{error, LexerWrapper, TokenWrapper, TokenWrapperOwned};
 use logos::Logos;
 use crate::compiler::parser::error::ParseError;
 use super::ast::*;
@@ -270,11 +270,7 @@ fn inner_statements(lex: &mut Lexer) -> LogicParseResult<InnerStatements> {
 fn inner_statement(lex: &mut Lexer) -> LogicParseResult<InnerStatement> {
     lex.start();
 
-    let res = match lex.expect_multiple_choices(
-        vec![Token::Identifier, Token::If, Token::Repeat, Token::Forever]
-    )? {
-        TokenWrapperOwned { token: Token::Identifier, .. } =>
-            InnerStatement::VariableAssignment(variable_assignment(lex)?),
+    let res = match lex.peek()? {
         TokenWrapperOwned { token: Token::If, .. } =>
             InnerStatement::IfStatement(if_statement(lex)?),
         TokenWrapperOwned { token: Token::Repeat, .. } =>
@@ -285,9 +281,34 @@ fn inner_statement(lex: &mut Lexer) -> LogicParseResult<InnerStatement> {
         TokenWrapperOwned { token: Token::Break, .. } => InnerStatement::Break,
         TokenWrapperOwned { token: Token::Continue, .. } => InnerStatement::Continue,
 
-        // todo: figure out how to fit expressions in here
+        TokenWrapperOwned { .. } => {
+            // can either be variable assignment or an expression (that can be a function or
+            // something)
+            // this is confusing af
+            let expr = expression(lex)?;
 
-        _ => unreachable!()
+            // expression will think that this is just a variable access
+            if let Expression::PrimaryExpression(
+                PrimaryExpression::VariableAccess { from, name }
+            ) = expr {
+                if let None = from {
+                    // regular name = value statement
+                    lex.expect(Token::EQ)?;
+                    let value = expression(lex)?;
+
+                    InnerStatement::VariableAssignment(VariableAssignment {
+                        identifier: name,
+                        value
+                    })
+                } else {
+                    // todo: implement from.name = value
+                    unimplemented!()
+                }
+            } else {
+                // todo: be able to do stuff like list[index] = value
+                InnerStatement::Expression(expr)
+            }
+        }
     };
 
     lex.success();
