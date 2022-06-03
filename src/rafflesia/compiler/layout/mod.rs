@@ -1,65 +1,134 @@
 pub mod parser;
 
 use std::collections::HashMap;
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, Context, Error, Result};
 use thiserror::Error;
 use parser::View;
-use swrs::api::view::{View as SWRSView, ViewType};
+use swrs::api::view::{SidesValue, View as SWRSView, ViewType};
+use swrs::color::Color;
+use swrs::parser::view::models::AndroidView;
 use swrs::parser::view::models::layout::{gravity, Orientation, Size};
 
 /// Compiles a parsed view into an swrs [`swrs::api::view::View`].
-pub fn compile_view_tree(mut parsed: View) -> Result<SWRSView> {
-    fn compile(mut parsed: View, state: &mut u32) -> Result<SWRSView> {
-        Ok(SWRSView {
-            id: if let Some(id) = parsed.view_id { id } else {
-                *state += 1;
-                format!("view{}", *state - 1)
-            },
-            background_color: Default::default(),
-            height: if let Some(hmap) = &mut parsed.attributes {
-                    if let Some(height) = hmap.remove("height") {
-                        match height.as_str() {
-                            "match_parent" => Size::MatchParent,
-                            "wrap_content" => Size::WrapContent,
-                            _ => Size::Fixed(
-                                height.parse()
-                                    .context(format!(
-                                        "Failed to convert height value `{}` to an integer", height
-                                    ))?
-                            )
-                        }
-                    } else { Size::WrapContent }
+pub fn compile_view_tree(parsed: View) -> Result<SWRSView> {
+
+    fn compile(parsed: View, parent_id: &str, parent_type: i8, state: &mut u32) -> Result<SWRSView> {
+        let view_id = if let Some(id) = parsed.view_id { id } else {
+            *state += 1;
+            format!("view{}", *state - 1)
+        };
+
+        Ok(if let Some(mut attrs) = parsed.attributes {
+            let view = view_name_to_view_type(parsed.name, &mut attrs)?;
+
+            macro_rules! attr_number_get {
+                ($name:expr,$default:expr) => {
+                    if let Some(val) = attrs.remove($name) {
+                        val.parse()
+                            .context(format!("invalid number given on field {}", $name))?
+                    } else { $default }
+                };
+            }
+
+            let padding = attrs
+                .remove("padding")
+                .map(|e| {
+                    match e.parse().context("invalid padding value") {
+                        Ok(val) => Ok(SidesValue {
+                            top: val, right: val, bottom: val, left: val
+                        }),
+                        Err(err) => Err(err)
+                    }
+                })
+                .unwrap_or_else(|| {
+                    Ok(SidesValue {
+                        top: attr_number_get!("padding_top", 8),
+                        right: attr_number_get!("padding_right", 8),
+                        bottom: attr_number_get!("padding_bottom", 8),
+                        left: attr_number_get!("padding_left", 8),
+                    })
+                })?;
+
+            let margin = attrs
+                .remove("margin")
+                .map(|e| {
+                    match e.parse().context("invalid margin value") {
+                        Ok(val) => Ok(SidesValue {
+                            top: val, right: val, bottom: val, left: val
+                        }),
+                        Err(err) => Err(err)
+                    }
+                })
+                .unwrap_or_else(|| {
+                    Ok(SidesValue {
+                        top: attr_number_get!("margin_top", 8),
+                        right: attr_number_get!("margin_right", 8),
+                        bottom: attr_number_get!("margin_bottom", 8),
+                        left: attr_number_get!("margin_left", 8),
+                    })
+                })?;
+
+            SWRSView {
+                background_color: if let Some(color) = attrs.remove("background_color") {
+                    Color::parse_hex(&*color)?
+                } else { Color::from(0xFFFFFF) },
+                height: if let Some(height) = attrs.remove("height") {
+                    match height.as_str() {
+                        "match_parent" => Size::MatchParent,
+                        "wrap_content" => Size::WrapContent,
+                        _ => Size::Fixed(
+                            height.parse()
+                                .context(format!(
+                                    "Failed to convert height value `{}` to an integer", height
+                                ))?
+                        )
+                    }
                 } else { Size::WrapContent },
-            width: if let Some(hmap) = &mut parsed.attributes {
-                    if let Some(width) = hmap.remove("width") {
-                        match width.as_str() {
-                            "match_parent" => Size::MatchParent,
-                            "wrap_content" => Size::WrapContent,
-                            _ => Size::Fixed(
-                                width.parse()
-                                    .context(format!(
-                                        "Failed to convert height value `{}` to an integer", height
-                                    ))?
-                            )
-                        }
-                    } else { Size::WrapContent }
+                width: if let Some(width) = attrs.remove("width") {
+                    match width.as_str() {
+                        "match_parent" => Size::MatchParent,
+                        "wrap_content" => Size::WrapContent,
+                        _ => Size::Fixed(
+                            width.parse()
+                                .context(format!(
+                                    "Failed to convert height value `{}` to an integer", width
+                                ))?
+                        )
+                    }
                 } else { Size::WrapContent },
-            padding: todo!(),
-            margin: todo!(),
-            weight: 0,
-            weight_sum: 0,
-            layout_gravity: Default::default(),
-            view: Ok(view_name_to_view_type(
-                parsed.name,
-                &mut parsed.attributes.unwrap_or_else(|| HashMap::new())
-            )?),
-            children: vec![],
-            raw: todo!(),
-            view_type: 0 // todo: fix this shayt
+                padding,
+                margin,
+                weight: attr_number_get!("weight", 0),
+                weight_sum: attr_number_get!("weight_sum", 0),
+                layout_gravity: Default::default(),
+                children: vec![],
+                raw: AndroidView::new_empty(view_id.as_str(), view.get_type_id(), parent_id, parent_type),
+                id: view_id,
+                view: Ok(view),
+            }
+        } else {
+            // when there's no attributes provided
+            let view = view_name_to_view_type(parsed.name, &mut HashMap::new())?;
+
+            SWRSView {
+                id: view_id.to_string(),
+                background_color: Color::from(0xffffff),
+                height: Size::WrapContent,
+                width: Size::WrapContent,
+                padding: SidesValue { top: 8, right: 8, bottom: 8, left: 8 },
+                margin: SidesValue { top: 8, right: 8, bottom: 8, left: 8},
+                weight: 0,
+                weight_sum: 0,
+                layout_gravity: Default::default(),
+                children: vec![],
+                raw: AndroidView::new_empty(view_id.as_str(), view.get_type_id(), parent_id, parent_type),
+                view: Ok(view),
+            }
         })
     }
 
-    compile(parsed, &mut 0u32)
+    // the root parent id of sketchware is "root"
+    compile(parsed, "root", 0, &mut 0u32)
 }
 
 fn view_name_to_view_type(name: String, attributes: &mut HashMap<String, String>)
@@ -129,7 +198,7 @@ fn view_name_to_view_type(name: String, attributes: &mut HashMap<String, String>
                             _ => return Err(ViewNameConversionError::InvalidAttributeValueItem {
                                 view_name: name,
                                 attribute_name: "gravity".to_string(),
-                                attribute_value: gravity,
+                                attribute_value: gravity.to_string(),
                                 attribute_value_item: val.to_string(),
                                 possible_value_items: vec![
                                     "center_horizontal".to_string(), "center_vertical".to_string(),
