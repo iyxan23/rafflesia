@@ -101,6 +101,7 @@ View-independent attributes are:
  - `width`: same as height
  - `weight`: an integer that sets the weight of the view
  - `weight_sum`: an integer that sets the weight sum of the view
+ - `background_color`: a hex value with any of these formats: `ffffff`, #ffffff`, `ffffffff`, `#ffffffff` that sets the background color of the view
  - `layout_gravity`: can be any of:
    - `center_horizontal`
    - `center_vertical`

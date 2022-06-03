@@ -70,7 +70,21 @@ pub fn compile_view_tree(parsed: View) -> Result<SWRSView> {
 
             SWRSView {
                 background_color: if let Some(color) = attrs.remove("background_color") {
-                    Color::parse_hex(&*color)?
+                    // supports "ffffff" "#ffffff" "ffffffff" "#ffffffff"
+                    if color.len() < 6 || color.len() > 9 {
+                        return Err(anyhow!(
+                            "unexpected color given on the field background_color: `{}`, can only \
+be hex color codes with the format \"ffffff\", \"#ffffff\", \"ffffffff\" or \"#ffffffff\"", color
+                        ));
+                    }
+
+                    Color::parse_hex(if color.len() % 2 == 0 {
+                        // this doesn't have a #
+                        &*color
+                    } else {
+                        // this does have a # at the start
+                        &color[1..]
+                    })?
                 } else { Color::from(0xFFFFFF) },
                 height: if let Some(height) = attrs.remove("height") {
                     match height.as_str() {
