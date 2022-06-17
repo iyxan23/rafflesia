@@ -296,7 +296,7 @@ fn map_view_name_attrs(name: String, attributes: &mut HashMap<String, String>)
             },
         "EditText" =>
             ViewType::EditText {
-                text: attributes.remove("text").unwrap_or_else(|| "TextView".to_string()),
+                text: attributes.remove("text").unwrap_or_else(|| "EditText".to_string()),
 
                 text_color: if let Some(text_color) = attributes.remove("text_color") {
                     parse_color(&*text_color, "text_color")?
@@ -505,14 +505,128 @@ fn map_view_name_attrs(name: String, attributes: &mut HashMap<String, String>)
                     }
                 } else { SpinnerMode::Dropdown }
             },
-        "CheckBox" => todo!(),
-        "Switch" => todo!(),
-        "SeekBar" => todo!(),
-        "CalendarView" => todo!(),
-        "Switch" => todo!(),
-        "Fab" => todo!(),
-        "AdView" => todo!(),
-        "MapView" => todo!(),
+        "CheckBox" =>
+            ViewType::CheckBox {
+                checked: if let Some(checked) = attributes.remove("checked") {
+                    checked.parse()
+                        .map_err(|err| ViewCompileError::AttributeParseError(
+                            AttributeParseError::InvalidBoolValue {
+                                attribute_name: "checked".to_string(),
+                                attribute_value: checked,
+                                err
+                            }
+                        ))?
+                } else { false },
+
+                text: attributes.remove("text").unwrap_or_else(|| "CheckBox".to_string()),
+
+                text_color: if let Some(text_color) = attributes.remove("text_color") {
+                    parse_color(&*text_color, "text_color")?
+                } else { Color::from(0x000000) },
+
+                text_size: if let Some(text_size) = attributes.remove("text_size") {
+                    text_size.parse()
+                        .map_err(|err| ViewCompileError::AttributeParseError(
+                            AttributeParseError::InvalidIntValue {
+                                attribute_name: "text_size".to_string(),
+                                attribute_value: text_size,
+                                err
+                            }
+                        ))?
+                } else { 12 },
+
+                text_font: attributes.remove("text").unwrap_or_else(|| "default_font".to_string()),
+
+                text_style: if let Some(text_style) = attributes.remove("text_style") {
+                    parse_text_style(&*text_style, "text_style")?
+                } else { TextType::Normal },
+            },
+        "Switch" =>
+            ViewType::Switch {
+                checked: if let Some(checked) = attributes.remove("checked") {
+                    checked.parse()
+                        .map_err(|err| ViewCompileError::AttributeParseError(
+                            AttributeParseError::InvalidBoolValue {
+                                attribute_name: "checked".to_string(),
+                                attribute_value: checked,
+                                err
+                            }
+                        ))?
+                } else { false },
+
+                text: attributes.remove("text").unwrap_or_else(|| "Switch".to_string()),
+
+                text_color: if let Some(text_color) = attributes.remove("text_color") {
+                    parse_color(&*text_color, "text_color")?
+                } else { Color::from(0x000000) },
+
+                text_size: if let Some(text_size) = attributes.remove("text_size") {
+                    text_size.parse()
+                        .map_err(|err| ViewCompileError::AttributeParseError(
+                            AttributeParseError::InvalidIntValue {
+                                attribute_name: "text_size".to_string(),
+                                attribute_value: text_size,
+                                err
+                            }
+                        ))?
+                } else { 12 },
+
+                text_font: attributes.remove("text").unwrap_or_else(|| "default_font".to_string()),
+
+                text_style: if let Some(text_style) = attributes.remove("text_style") {
+                    parse_text_style(&*text_style, "text_style")?
+                } else { TextType::Normal },
+            },
+        "SeekBar" =>
+            ViewType::SeekBar {
+                max_progress: if let Some(max_progress) = attributes.remove("max_progress") {
+                    max_progress.parse()
+                        .map_err(|err| ViewCompileError::AttributeParseError(
+                            AttributeParseError::InvalidIntValue {
+                                attribute_name: "max_progress".to_string(),
+                                attribute_value: max_progress,
+                                err
+                            }
+                        ))?
+                } else { 100 },
+
+                progress: if let Some(progress) = attributes.remove("progress") {
+                    progress.parse()
+                        .map_err(|err| ViewCompileError::AttributeParseError(
+                            AttributeParseError::InvalidIntValue {
+                                attribute_name: "progress".to_string(),
+                                attribute_value: progress,
+                                err
+                            }
+                        ))?
+                } else { 0 },
+            },
+        "CalendarView" =>
+            ViewType::CalendarView {
+                first_day_of_week: if let Some(first_day_of_the_week) = attributes.remove("first_day_of_the_week") {
+                    first_day_of_the_week.parse()
+                        .map_err(|err| ViewCompileError::AttributeParseError(
+                            AttributeParseError::InvalidIntValue {
+                                attribute_name: "first_day_of_the_week".to_string(),
+                                attribute_value: first_day_of_the_week,
+                                err
+                            }
+                        ))?
+                } else { 1 }
+            },
+        // todo: make this illegal to be placed in regular layout, must be placed in a special place
+        //       or something
+        "FloatingActionButton" =>
+            ViewType::Fab {
+                // todo: validate with resources defined in manifest soon
+                image_res_name: attributes.remove("image").unwrap_or_else(|| "".to_string())
+            },
+        "AdView" =>
+            ViewType::AdView {
+                // i have no idea what this is for, i dont use adviews
+                adview_size: attributes.remove("adview_size").unwrap_or_else(|| "".to_string())
+            },
+        "MapView" => ViewType::MapView,
         _ => return Err(ViewCompileError::UnknownView { view_name: name })
     })
 }

@@ -170,10 +170,10 @@ View-specific attributes in sketchware and supported by rafflesia are:
  - <details><summary><code>EditText</code></summary>
    Attributes:
    <ul>
-     <li><code>text</code>: a text for the button. default is <code>Button</code></li>
+     <li><code>text</code>: a text for the button. default is <code>EditText</code></li>
      <li><code>text_color</code>: a hex value with any of these formats: <code>ffffff</code>, <code>#ffffff</code>, <code>ffffffff</code>, <code>#ffffffff</code> that sets the color of the text of the edittext</li>
-     <li><code>text_size</code>: an integer that sets the size of the text of the button in dp. default is 12</li>
-     <li><code>single_line</code>: a boolean that restricts the edittext to be able to only have a single line if true. default is false</li>
+     <li><code>text_size</code>: an integer that sets the size of the text of this edittext in dp. default is 12</li>
+     <li><code>single_line</code>: a boolean that restricts this edittext to be able to only have a single line if true. default is false</li>
      <li><code>text_font</code>: a font reference that sets the font of this edittext. <b>please do note that resource management is yet to be implemented in rafflesia, this attribute won't work</b>. default is sketchware's <code>default_font</code></li>
      <li><code>text_style</code>: can be any of <code>bold</code>, or <code>italic</code> or them combined separated with <code>|</code>. e.g. <code>bold|italic</code></li>
      <li><code>lines</code>: an integer that restricts the amount of lines that can be displayed in the edittext.</li>
@@ -208,7 +208,7 @@ View-specific attributes in sketchware and supported by rafflesia are:
    Attributes:
    <ul>
      <li><code>image</code>: an image resource reference that sets the image of this imageview. <b>please do note that resource management is yet to be implemented in rafflesia, this attribute won't work</b></li>
-     <li><code>scale_type</code>: a scale type that defines how an image displayed in an imageview would be scaled depending on the size of the imageview.
+     <li><code>scale_type</code>: a scale type that defines how an image displayed in this imageview would be scaled depending on the size of the imageview.
        can be any of:
        <ul>
          <li><code>center</code></li>
@@ -249,7 +249,12 @@ View-specific attributes in sketchware and supported by rafflesia are:
  - <details><summary><code>CheckBox</code></summary>
    Attributes:
    <ul>
-     <li></li>
+     <li><code>checked</code>: a boolean whether this checkbox is checked</li>
+     <li><code>text</code>: a text for this checkbox. default is <code>CheckBox</code></li>
+     <li><code>text_color</code>: a hex value with any of these formats: <code>ffffff</code>, <code>#ffffff</code>, <code>ffffffff</code>, <code>#ffffffff</code> that sets the color of the text of the edittext</li>
+     <li><code>text_size</code>: an integer that sets the size of the text of this checkbox in dp. default is 12</li>
+     <li><code>text_font</code>: a font reference that sets the font of this checkbox. <b>please do note that resource management is yet to be implemented in rafflesia, this attribute won't work</b>. default is sketchware's <code>default_font</code></li>
+     <li><code>text_style</code>: can be any of <code>bold</code>, or <code>italic</code> or them combined separated with <code>|</code>. e.g. <code>bold|italic</code></li>
    </ul>
    </details>
  - <details><summary><code>ScrollView</code></summary>
@@ -273,36 +278,39 @@ View-specific attributes in sketchware and supported by rafflesia are:
  - <details><summary><code>Switch</code></summary>
    Attributes:
    <ul>
-     <li></li>
+     <li><code>checked</code>: a boolean whether this switch is on or off</li>
+     <li><code>text</code>: a text for this checkbox. default is <code>Switch</code></li>
+     <li><code>text_color</code>: a hex value with any of these formats: <code>ffffff</code>, <code>#ffffff</code>, <code>ffffffff</code>, <code>#ffffffff</code> that sets the color of the text of the edittext</li>
+     <li><code>text_size</code>: an integer that sets the size of the text of this switch in dp. default is 12</li>
+     <li><code>text_font</code>: a font reference that sets the font of this switch. <b>please do note that resource management is yet to be implemented in rafflesia, this attribute won't work</b>. default is sketchware's <code>default_font</code></li>
+     <li><code>text_style</code>: can be any of <code>bold</code>, or <code>italic</code> or them combined separated with <code>|</code>. e.g. <code>bold|italic</code></li>
    </ul>
    </details>
  - <details><summary><code>SeekBar</code></summary>
    Attributes:
    <ul>
-     <li></li>
+     <li><code>max_progress</code>: an integer that sets the maximum amount of this seekbar. default is 100</li>
+     <li><code>progress</code>: an integer that sets the current value of this seekbar. default is 0</li>
    </ul>
    </details>
  - <details><summary><code>CalendarView</code></summary>
    Attributes:
    <ul>
-     <li></li>
+     <li><code>first_day_of_the_week</code>: an integer that sets what the first day of the week to be rendered in this CalendarView</li>
    </ul>
    </details>
- - <details><summary><code>Fab</code></summary>
+ - <details><summary><code>FloatingActionButton</code></summary>
    Attributes:
    <ul>
-     <li></li>
+     <li><code>image</code>: an image reference that sets the image of this floating action button</li>
    </ul>
    </details>
  - <details><summary><code>AdView</code></summary>
    Attributes:
    <ul>
-     <li></li>
+     <li><code>adview_size</code>: a string that sets the adview size? I have no idea how this is used</li>
    </ul>
    </details>
  - <details><summary><code>MapView</code></summary>
-   Attributes:
-   <ul>
-     <li></li>
-   </ul>
+   MapView has no view-specific attributes
    </details>
