@@ -7,7 +7,8 @@ use thiserror::Error;
 use parser::View;
 use swrs::api::view::{SidesValue, View as SWRSView, ViewType};
 use swrs::color::Color;
-use swrs::parser::view::models::AndroidView;
+use swrs::parser::view::models::{AndroidView, SpinnerMode};
+use swrs::parser::view::models::image::ImageScaleType;
 use swrs::parser::view::models::layout::{gravity, Orientation, Size};
 use swrs::parser::view::models::layout::gravity::Gravity;
 use swrs::parser::view::models::text::{ImeOption, InputType, TextType};
@@ -394,11 +395,116 @@ fn map_view_name_attrs(name: String, attributes: &mut HashMap<String, String>)
                     }
                 } else { InputType::Text }
             },
-        "ImageView" => todo!(),
-        "WebView" => todo!(),
-        "ProgressBar" => todo!(),
-        "ListView" => todo!(),
-        "Spinner" => todo!(),
+        "ImageView" =>
+            ViewType::ImageView {
+                // todo: validation with the resources defined in manifest soon
+                image_res_name: attributes.remove("images").unwrap_or_else(|| String::new()),
+                image_scale_type: if let Some(scale_type) = attributes.remove("scale_type") {
+                    match scale_type.as_str() {
+                        "center" => ImageScaleType::Center,
+                        "fit_xy" => ImageScaleType::FitXy,
+                        "fit_start" => ImageScaleType::FitStart,
+                        "fit_end" => ImageScaleType::FitEnd,
+                        "center_crop" => ImageScaleType::CenterCrop,
+                        "center_inside" => ImageScaleType::CenterInside,
+                        _ => return Err(ViewCompileError::AttributeParseError(
+                            AttributeParseError::InvalidAttributeValue {
+                                attribute_name: "scale_type".to_string(),
+                                attribute_value: scale_type,
+                                possible_values: vec![
+                                    "center".to_string(), "fit_xy".to_string(),
+                                    "fit_start".to_string(), "fit_end".to_string(),
+                                    "center_crop".to_string(), "center_inside".to_string()
+                                ]
+                            }
+                        ))
+                    }
+                } else { ImageScaleType::Center }
+            },
+        "WebView" => ViewType::WebView, // literally
+        "ProgressBar" =>
+            ViewType::ProgressBar {
+                max_progress: if let Some(max_progress) = attributes.remove("max_progress") {
+                    max_progress.parse()
+                        .map_err(|err| ViewCompileError::AttributeParseError(
+                            AttributeParseError::InvalidIntValue {
+                                attribute_name: "max_progress".to_string(),
+                                attribute_value: max_progress,
+                                err
+                            }
+                        ))?
+                } else { 100 },
+
+                progress: if let Some(progress) = attributes.remove("progress") {
+                    progress.parse()
+                        .map_err(|err| ViewCompileError::AttributeParseError(
+                            AttributeParseError::InvalidIntValue {
+                                attribute_name: "progress".to_string(),
+                                attribute_value: progress,
+                                err
+                            }
+                        ))?
+                } else { 0 },
+
+                indeterminate: if let Some(indeterminate) = attributes.remove("indeterminate") {
+                    indeterminate.parse()
+                        .map_err(|err| ViewCompileError::AttributeParseError(
+                            AttributeParseError::InvalidBoolValue {
+                                attribute_name: "indeterminate".to_string(),
+                                attribute_value: indeterminate,
+                                err
+                            }
+                        ))?
+                } else { false },
+
+                progress_style: if let Some(progress_style) = attributes.remove("progress_style") {
+                    match progress_style.as_str() {
+                        "horizontal" => "?android:progressBarStyleHorizontal",
+                        "circular" | "circle" => "?android:progressBarStyle",
+                        _ => return Err(ViewCompileError::AttributeParseError(
+                            AttributeParseError::InvalidAttributeValue {
+                                attribute_name: "progress_style".to_string(),
+                                attribute_value: progress_style,
+                                possible_values: vec![
+                                    "horizontal".to_string(), "circular".to_string(), "circle".to_string()
+                                ]
+                            }
+                        ))
+                    }
+                } else { "?android:progressBarStyle" }.to_string()
+            },
+        "ListView" =>
+            ViewType::ListView {
+                divider_height: if let Some(divider_height) = attributes.remove("divider_height") {
+                    divider_height.parse()
+                        .map_err(|err| ViewCompileError::AttributeParseError(
+                            AttributeParseError::InvalidIntValue {
+                                attribute_name: "divider_height".to_string(),
+                                attribute_value: divider_height,
+                                err
+                            }
+                        ))?
+                } else { 0 },
+
+                // todo: validation with the resources defined in manifest soon
+                custom_view: attributes.remove("custom_view").unwrap_or_else(|| String::new())
+            },
+        "Spinner" =>
+            ViewType::Spinner {
+                spinner_mode: if let Some(spinner_mode) = attributes.remove("spinner_mode") {
+                    match spinner_mode.as_str() {
+                        "dropdown" => SpinnerMode::Dropdown,
+                        "dialog" => SpinnerMode::Dialog,
+                        _ => return Err(ViewCompileError::AttributeParseError(
+                            AttributeParseError::InvalidAttributeValue {
+                                attribute_name: "spinner_mode".to_string(),
+                                attribute_value: spinner_mode,
+                                possible_values: vec!["dropdown".to_string(), "dialog".to_string()]
+                            }
+                        ))
+                    }
+                } else { SpinnerMode::Dropdown }
+            },
         "CheckBox" => todo!(),
         "Switch" => todo!(),
         "SeekBar" => todo!(),

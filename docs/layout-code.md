@@ -162,7 +162,7 @@ View-specific attributes in sketchware and supported by rafflesia are:
      <li><code>text_color</code>: a hex value with any of these formats: <code>ffffff</code>, <code>#ffffff</code>, <code>ffffffff</code>, <code>#ffffffff</code> that sets the color of the text of the textview</li>
      <li><code>text_size</code>: an integer that sets the size of the text of the button in dp. default is 12</li>
      <li><code>single_line</code>: a boolean that restricts the textview to be able to only have a single line if true. default is false</li>
-     <li><code>text_font</code>: a font reference that sets the font of this textview. <b>please do note that resource management is unimplemented, this attribute won't work</b>. default is sketchware's <code>default_font</code></li>
+     <li><code>text_font</code>: a font reference that sets the font of this textview. <b>please do note that resource management is yet to be implemented in rafflesia, this attribute won't work</b>. default is sketchware's <code>default_font</code></li>
      <li><code>text_style</code>: can be any of <code>bold</code>, or <code>italic</code> or them combined separated with <code>|</code>. e.g. <code>bold|italic</code></li>
      <li><code>lines</code>: an integer that restricts the amount of lines that can be displayed in the textview.</li>
    </ul>
@@ -174,7 +174,7 @@ View-specific attributes in sketchware and supported by rafflesia are:
      <li><code>text_color</code>: a hex value with any of these formats: <code>ffffff</code>, <code>#ffffff</code>, <code>ffffffff</code>, <code>#ffffffff</code> that sets the color of the text of the edittext</li>
      <li><code>text_size</code>: an integer that sets the size of the text of the button in dp. default is 12</li>
      <li><code>single_line</code>: a boolean that restricts the edittext to be able to only have a single line if true. default is false</li>
-     <li><code>text_font</code>: a font reference that sets the font of this edittext. <b>please do note that resource management is unimplemented, this attribute won't work</b>. default is sketchware's <code>default_font</code></li>
+     <li><code>text_font</code>: a font reference that sets the font of this edittext. <b>please do note that resource management is yet to be implemented in rafflesia, this attribute won't work</b>. default is sketchware's <code>default_font</code></li>
      <li><code>text_style</code>: can be any of <code>bold</code>, or <code>italic</code> or them combined separated with <code>|</code>. e.g. <code>bold|italic</code></li>
      <li><code>lines</code>: an integer that restricts the amount of lines that can be displayed in the edittext.</li>
      <li><code>hint</code>: a text that sets the hint of this edittext. default is an empty string</li>
@@ -207,31 +207,43 @@ View-specific attributes in sketchware and supported by rafflesia are:
  - <details><summary><code>ImageView</code></summary>
    Attributes:
    <ul>
-     <li></li>
+     <li><code>image</code>: an image resource reference that sets the image of this imageview. <b>please do note that resource management is yet to be implemented in rafflesia, this attribute won't work</b></li>
+     <li><code>scale_type</code>: a scale type that defines how an image displayed in an imageview would be scaled depending on the size of the imageview.
+       can be any of:
+       <ul>
+         <li><code>center</code></li>
+         <li><code>fit_xy</code></li>
+         <li><code>fit_start</code></li>
+         <li><code>fit_end</code></li>
+         <li><code>center_crop</code></li>
+         <li><code>center_inside</code></li>
+       </ul>
+     </li>
    </ul>
    </details>
  - <details><summary><code>WebView</code></summary>
-   Attributes:
-   <ul>
-     <li></li>
-   </ul>
+   WebView has no view-specific attributes
    </details>
  - <details><summary><code>ProgressBar</code></summary>
    Attributes:
    <ul>
-     <li></li>
+     <li><code>max_progress</code>: an integer that sets the maximum amount of this progressbar given that it's determinate. default is 100</li>
+     <li><code>progress</code>: an integer that sets the current value of this progressbar given that it's determinate. default is 0</li>
+     <li><code>indeterminate</code>: a boolean that sets whether this progressbar is supposed to show a specific quantity of progress (determinate) or not (indeterminate). default is false</li>
+     <li><code>progress_style</code>: any of <code>horizontal</code> for horizontal-styled progressbar, or <code>circular</code>/<code>circle</code> for circular-styled progressbar. default is circular</li>
    </ul>
    </details>
  - <details><summary><code>ListView</code></summary>
    Attributes:
    <ul>
-     <li></li>
+     <li><code>divider_height</code>: an integer that sets the divider height of this listview. default is 0</li>
+     <li><code>custom_view</code>: a custom view reference that sets this listview's custom view. <b>please do note that resource management is yet to be implemented in rafflesia, this attribute won't work</b></li>
    </ul>
    </details>
  - <details><summary><code>Spinner</code></summary>
    Attributes:
    <ul>
-     <li></li>
+     <li><code>spinner_mode</code>: a spinner mode that sets the appearance of the spinner when clicked. can be either a <code>dropdown</code> or <code>dialog</code>. default is <code>dropdown</code></li>
    </ul>
    </details>
  - <details><summary><code>CheckBox</code></summary>
