@@ -101,7 +101,7 @@ View-independent attributes are:
  - `width`: same as height
  - `weight`: an integer that sets the weight of the view
  - `weight_sum`: an integer that sets the weight sum of the view
- - `background_color`: a hex value with any of these formats: `ffffff`, #ffffff`, `ffffffff`, `#ffffffff` that sets the background color of the view
+ - `background_color`: a hex value with any of these formats: `ffffff`, `#ffffff`, `ffffffff`, `#ffffffff` that sets the background color of the view
  - `layout_gravity`: can be any of:
    - `center_horizontal`
    - `center_vertical`
@@ -146,23 +146,62 @@ View-specific attributes in sketchware and supported by rafflesia are:
      </li>
    </ul>
    </details>
-
  - <details><summary><code>Button</code></summary>
    Attributes:
    <ul>
-     <li></li>
+     <li><code>text</code>: a text for the button. default is <code>Button</code></li>
+     <li><code>text_color</code>: a hex value with any of these formats: <code>ffffff</code>, <code>#ffffff</code>, <code>ffffffff</code>, <code>#ffffffff</code> that sets the color of the text of the button</li>
+     <li><code>text_size</code>: an integer that sets the size of the text of the button in dp. default is 12</li>
+     <li><code>text_style</code>: can be any of <code>bold</code>, or <code>italic</code> or them combined separated with <code>|</code>. e.g. <code>bold|italic</code></li>
    </ul>
    </details>
  - <details><summary><code>TextView</code></summary>
    Attributes:
    <ul>
-     <li></li>
+     <li><code>text</code>: a text for the button. default is <code>Button</code></li>
+     <li><code>text_color</code>: a hex value with any of these formats: <code>ffffff</code>, <code>#ffffff</code>, <code>ffffffff</code>, <code>#ffffffff</code> that sets the color of the text of the textview</li>
+     <li><code>text_size</code>: an integer that sets the size of the text of the button in dp. default is 12</li>
+     <li><code>single_line</code>: a boolean that restricts the textview to be able to only have a single line if true. default is false</li>
+     <li><code>text_font</code>: a font reference that sets the font of this textview. <b>please do note that resource management is unimplemented, this attribute won't work</b>. default is sketchware's <code>default_font</code></li>
+     <li><code>text_style</code>: can be any of <code>bold</code>, or <code>italic</code> or them combined separated with <code>|</code>. e.g. <code>bold|italic</code></li>
+     <li><code>lines</code>: an integer that restricts the amount of lines that can be displayed in the textview.</li>
    </ul>
    </details>
  - <details><summary><code>EditText</code></summary>
    Attributes:
    <ul>
-     <li></li>
+     <li><code>text</code>: a text for the button. default is <code>Button</code></li>
+     <li><code>text_color</code>: a hex value with any of these formats: <code>ffffff</code>, <code>#ffffff</code>, <code>ffffffff</code>, <code>#ffffffff</code> that sets the color of the text of the edittext</li>
+     <li><code>text_size</code>: an integer that sets the size of the text of the button in dp. default is 12</li>
+     <li><code>single_line</code>: a boolean that restricts the edittext to be able to only have a single line if true. default is false</li>
+     <li><code>text_font</code>: a font reference that sets the font of this edittext. <b>please do note that resource management is unimplemented, this attribute won't work</b>. default is sketchware's <code>default_font</code></li>
+     <li><code>text_style</code>: can be any of <code>bold</code>, or <code>italic</code> or them combined separated with <code>|</code>. e.g. <code>bold|italic</code></li>
+     <li><code>lines</code>: an integer that restricts the amount of lines that can be displayed in the edittext.</li>
+     <li><code>hint</code>: a text that sets the hint of this edittext. default is an empty string</li>
+     <li><code>hint_color</code>: a hex value with any of these formats: <code>ffffff</code>, <code>#ffffff</code>, <code>ffffffff</code>, <code>#ffffffff</code> that sets the color of the hint of the edittext</li>
+     <li><code>ime_option</code>: an ime option value that changes the "enter" button in soft keyboards.
+       can be any of these values:
+       <ul>
+         <li><code>normal</code></li>
+         <li><code>none</code></li>
+         <li><code>go</code></li>
+         <li><code>search</code></li>
+         <li><code>send</code></li>
+         <li><code>next</code></li>
+         <li><code>done</code></li>
+       </ul>
+     </li>
+     <li><code>input_type</code>: an input type that restricts the user from entering different types of values.
+       can be any of these values:
+       <ul>
+         <li><code>decimal</code></li>
+         <li><code>signed</code></li>
+         <li><code>decimal_signed</code></li>
+         <li><code>text</code></li>
+         <li><code>password</code></li>
+         <li><code>phone</code></li>
+       </ul>
+   </li>
    </ul>
    </details>
  - <details><summary><code>ImageView</code></summary>
@@ -204,7 +243,19 @@ View-specific attributes in sketchware and supported by rafflesia are:
  - <details><summary><code>ScrollView</code></summary>
    Attributes:
    <ul>
-     <li></li>
+     <li><code>orientation</code>: <code>vertical</code> / <code>horizontal</code></li>
+     <li><code>gravity</code>: can be any of <ul>
+       <li><code>center_horizontal</code></li>
+       <li><code>center_vertical</code></li>
+       <li><code>center</code> (mix of both <code>center_horizontal</code> and <code>center_vertical</code></li>
+       <li><code>left</code></li>
+       <li><code>right</code></li>
+       <li><code>top</code></li>
+       <li><code>bottom</code></li>
+     </ul>
+     or them combined separated with <code>|</code>. e.g: <code>left|bottom</code> (spaces are ignored)<br/>
+     Specifying opposite gravity values together (e.g. <code>left|right</code>) will result in an error.
+     </li>
    </ul>
    </details>
  - <details><summary><code>Switch</code></summary>

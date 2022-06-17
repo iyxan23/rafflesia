@@ -2,6 +2,7 @@ pub mod parser;
 
 use std::collections::HashMap;
 use std::num::{ParseFloatError, ParseIntError};
+use std::str::ParseBoolError;
 use thiserror::Error;
 use parser::View;
 use swrs::api::view::{SidesValue, View as SWRSView, ViewType};
@@ -9,6 +10,8 @@ use swrs::color::Color;
 use swrs::parser::view::models::AndroidView;
 use swrs::parser::view::models::layout::{gravity, Orientation, Size};
 use swrs::parser::view::models::layout::gravity::Gravity;
+use swrs::parser::view::models::text::{ImeOption, InputType, TextType};
+use crate::compiler::layout::attr_parser::{parse_color, parse_gravity, parse_text_style};
 
 /// Compiles a parsed view into an swrs [`swrs::api::view::View`].
 pub fn compile_view_tree(parsed: View) -> Result<SWRSView, ViewCompileError> {
@@ -89,28 +92,7 @@ pub fn compile_view_tree(parsed: View) -> Result<SWRSView, ViewCompileError> {
 
             SWRSView {
                 background_color: if let Some(color) = attrs.remove("background_color") {
-                    // supports "ffffff" "#ffffff" "ffffffff" "#ffffffff"
-                    if color.len() < 6 || color.len() > 9 {
-                        return Err(ViewCompileError::AttributeParseError(
-                            AttributeParseError::InvalidColorValue {
-                                attribute_name: "background_color".to_string(),
-                                attribute_value: color
-                            }
-                        ));
-                    }
-
-                    Color::parse_hex(if color.len() % 2 == 0 {
-                        // this doesn't have a #
-                        &*color
-                    } else {
-                        // this does have a # at the start
-                        &color[1..]
-                    }).map_err(|_| ViewCompileError::AttributeParseError(
-                        AttributeParseError::InvalidColorValue {
-                            attribute_name: "background_color".to_string(),
-                            attribute_value: color
-                        }
-                    ))?
+                    parse_color(&*color, "background_color")?
                 } else { Color::from(0xFFFFFF) },
                 height: if let Some(height) = attrs.remove("height") {
                     match height.as_str() {
@@ -149,68 +131,7 @@ pub fn compile_view_tree(parsed: View) -> Result<SWRSView, ViewCompileError> {
                 weight: attr_number_get!("weight", 0),
                 weight_sum: attr_number_get!("weight_sum", 0),
                 layout_gravity: if let Some(layout_gravity) = attrs.remove("layout_gravity") {
-                    let values: Vec<&str> = layout_gravity.split("|").map(&str::trim).collect();
-                    let mut result = Gravity(gravity::NONE);
-
-                    let mut horizontal_taken = false;
-                    let mut vertical_taken = false;
-
-                    // errors when an incompatible gravity is specified
-                    macro_rules! err_if_taken {
-                        ($taken_var:ident,$incompatible:expr,$incompatible_with:expr) => {
-                            if $taken_var {
-                                return Err(ViewCompileError::AttributeParseError(
-                                    AttributeParseError::IncompatibleAttributeValueItem {
-                                        attribute_name: "gravity".to_string(),
-                                        attribute_value: layout_gravity,
-                                        attribute_value_item_incompatible: $incompatible.to_string(),
-                                        attribute_value_item_incompatible_with: $incompatible_with.to_string()
-                                    }
-                                ));
-                            }
-
-                            $taken_var = true;
-                        };
-                    }
-
-                    for val in values {
-                        result.0 |= match val {
-                            "center_horizontal" => gravity::CENTER_HORIZONTAL,
-                            "center_vertical" => gravity::CENTER_VERTICAL,
-                            "center" => gravity::CENTER,
-                            "left" => {
-                                err_if_taken!(horizontal_taken, "left", "right");
-                                gravity::LEFT
-                            },
-                            "right" => {
-                                err_if_taken!(horizontal_taken, "right", "left");
-                                gravity::RIGHT
-                            },
-                            "top" => {
-                                err_if_taken!(vertical_taken, "top", "bottom");
-                                gravity::TOP
-                            },
-                            "bottom" => {
-                                err_if_taken!(vertical_taken, "bottom", "top");
-                                gravity::BOTTOM
-                            },
-                            other => return Err(ViewCompileError::AttributeParseError(
-                                AttributeParseError::InvalidAttributeValueItem {
-                                    attribute_name: "layout_gravity".to_string(),
-                                    attribute_value: layout_gravity.to_owned(),
-                                    attribute_value_item: other.to_string(),
-                                    possible_value_items: vec![
-                                        "center_horizontal".to_string(), "center_vertical".to_string(),
-                                        "center".to_string(),
-                                        "left".to_string(), "right".to_string(),
-                                        "top".to_string(), "bottom".to_string()
-                                    ],
-                                }
-                            ))
-                        }
-                    }
-
-                    result
+                    parse_gravity(&*layout_gravity, "layout_gravity")?
                 } else { Gravity::default() },
                 children: vec![],
                 raw: AndroidView::new_empty(view_id.as_str(), view.get_type_id(), parent_id, parent_type),
@@ -261,7 +182,7 @@ fn map_view_name_attrs(name: String, attributes: &mut HashMap<String, String>)
     -> Result<ViewType, ViewCompileError> {
 
     Ok(match name.as_str() {
-        "LinearLayout" => {
+        "LinearLayout" =>
             ViewType::LinearLayout {
                 orientation: if let Some(orientation) = attributes.remove("orientation") {
                     match orientation.as_str() {
@@ -278,75 +199,201 @@ fn map_view_name_attrs(name: String, attributes: &mut HashMap<String, String>)
                 } else { Orientation::Vertical }, // default is vertical if no orientation specified
 
                 gravity: if let Some(gravity) = attributes.remove("gravity") {
-                    let values: Vec<&str> = gravity.split("|").map(|s| s.trim()).collect();
-                    let mut result = Gravity(gravity::NONE);
-
-                    let mut horizontal_taken = false;
-                    let mut vertical_taken = false;
-
-                    // errors when an incompatible gravity is specified
-                    macro_rules! err_if_taken {
-                        ($taken_var:ident,$incompatible:expr,$incompatible_with:expr) => {
-                            if $taken_var {
-                                return Err(ViewCompileError::AttributeParseError(
-                                    AttributeParseError::IncompatibleAttributeValueItem {
-                                        attribute_name: "gravity".to_string(),
-                                        attribute_value: gravity,
-                                        attribute_value_item_incompatible: $incompatible.to_string(),
-                                        attribute_value_item_incompatible_with: $incompatible_with.to_string()
-                                    }
-                                ))
-                            }
-
-                            $taken_var = true;
-                        };
-                    }
-
-                    for val in values {
-                        result.0 |= match val {
-                            "center_horizontal" => gravity::CENTER_HORIZONTAL,
-                            "center_vertical" => gravity::CENTER_VERTICAL,
-                            "center" => gravity::CENTER,
-                            "left" => {
-                                err_if_taken!(horizontal_taken, "left", "right");
-                                gravity::LEFT
-                            },
-                            "right" => {
-                                err_if_taken!(horizontal_taken, "right", "left");
-                                gravity::RIGHT
-                            },
-                            "top" => {
-                                err_if_taken!(vertical_taken, "top", "bottom");
-                                gravity::TOP
-                            },
-                            "bottom" => {
-                                err_if_taken!(vertical_taken, "bottom", "top");
-                                gravity::BOTTOM
-                            },
-                            _ => return Err(ViewCompileError::AttributeParseError(
-                                AttributeParseError::InvalidAttributeValueItem {
-                                    attribute_name: "gravity".to_string(),
-                                    attribute_value: gravity.to_string(),
-                                    attribute_value_item: val.to_string(),
-                                    possible_value_items: vec![
-                                        "center_horizontal".to_string(), "center_vertical".to_string(),
-                                        "center".to_string(),
-                                        "left".to_string(), "right".to_string(),
-                                        "top".to_string(), "bottom".to_string()
-                                    ]
-                                }
-                            ))
-                        }
-                    }
-
-                    result
+                    parse_gravity(&*gravity, "gravity")?
                 } else { Gravity(gravity::NONE) }
-            }
-        },
-        "ScrollView" => todo!(),
-        "Button" => todo!(),
-        "TextView" => todo!(),
-        "EditText" => todo!(),
+            },
+        "ScrollView" =>
+            ViewType::ScrollView {
+                orientation: if let Some(orientation) = attributes.remove("orientation") {
+                    match orientation.as_str() {
+                        "vertical" => Orientation::Vertical,
+                        "horizontal" => Orientation::Horizontal,
+                        _ => return Err(ViewCompileError::AttributeParseError(
+                            AttributeParseError::InvalidAttributeValue {
+                                attribute_name: "orientation".to_string(),
+                                attribute_value: orientation,
+                                possible_values: vec!["vertical".to_string(), "horizontal".to_string()]
+                            })
+                        )
+                    }
+                } else { Orientation::Vertical }, // default is vertical if no orientation specified
+
+                gravity: if let Some(gravity) = attributes.remove("gravity") {
+                    parse_gravity(&*gravity, "gravity")?
+                } else { Gravity(gravity::NONE) }
+            },
+        "Button" =>
+            ViewType::Button {
+                text: attributes.remove("text").unwrap_or_else(|| "Button".to_string()),
+
+                text_color: if let Some(text_color) = attributes.remove("text_color") {
+                    parse_color(&*text_color, "text_color")?
+                } else { Color::from(0x000000) },
+
+                text_size: if let Some(text_size) = attributes.remove("text_size") {
+                    text_size.parse()
+                        .map_err(|err| ViewCompileError::AttributeParseError(
+                            AttributeParseError::InvalidIntValue {
+                                attribute_name: "text_size".to_string(),
+                                attribute_value: text_size,
+                                err
+                            }
+                        ))?
+                } else { 12 },
+
+                text_style: if let Some(text_style) = attributes.remove("text_style") {
+                    parse_text_style(&*text_style, "text_style")?
+                } else { TextType::Normal }
+            },
+        "TextView" =>
+            ViewType::TextView {
+                text: attributes.remove("text").unwrap_or_else(|| "TextView".to_string()),
+
+                text_color: if let Some(text_color) = attributes.remove("text_color") {
+                    parse_color(&*text_color, "text_color")?
+                } else { Color::from(0x000000) },
+
+                text_size: if let Some(text_size) = attributes.remove("text_size") {
+                    text_size.parse()
+                        .map_err(|err| ViewCompileError::AttributeParseError(
+                            AttributeParseError::InvalidIntValue {
+                                attribute_name: "text_size".to_string(),
+                                attribute_value: text_size,
+                                err
+                            }
+                        ))?
+                } else { 12 },
+
+                single_line: if let Some(single_line) = attributes.remove("single_line") {
+                    single_line.parse()
+                        .map_err(|err| ViewCompileError::AttributeParseError(
+                            AttributeParseError::InvalidBoolValue {
+                                attribute_name: "single_line".to_string(),
+                                attribute_value: single_line,
+                                err
+                            }
+                        ))?
+                } else { false },
+
+                // todo: validation with the resources defined in manifest soon
+                text_font: attributes.remove("text").unwrap_or_else(|| "default_font".to_string()),
+
+                text_style: if let Some(text_style) = attributes.remove("text_style") {
+                    parse_text_style(&*text_style, "text_style")?
+                } else { TextType::Normal },
+
+                lines: if let Some(lines) = attributes.remove("lines") {
+                    lines.parse()
+                        .map_err(|err| ViewCompileError::AttributeParseError(
+                            AttributeParseError::InvalidIntValue {
+                                attribute_name: "lines".to_string(),
+                                attribute_value: lines,
+                                err
+                            }
+                        ))?
+                } else { 0 }
+            },
+        "EditText" =>
+            ViewType::EditText {
+                text: attributes.remove("text").unwrap_or_else(|| "TextView".to_string()),
+
+                text_color: if let Some(text_color) = attributes.remove("text_color") {
+                    parse_color(&*text_color, "text_color")?
+                } else { Color::from(0x000000) },
+
+                text_size: if let Some(text_size) = attributes.remove("text_size") {
+                    text_size.parse()
+                        .map_err(|err| ViewCompileError::AttributeParseError(
+                            AttributeParseError::InvalidIntValue {
+                                attribute_name: "text_size".to_string(),
+                                attribute_value: text_size,
+                                err
+                            }
+                        ))?
+                } else { 12 },
+
+                single_line: if let Some(single_line) = attributes.remove("single_line") {
+                    single_line.parse()
+                        .map_err(|err| ViewCompileError::AttributeParseError(
+                            AttributeParseError::InvalidBoolValue {
+                                attribute_name: "single_line".to_string(),
+                                attribute_value: single_line,
+                                err
+                            }
+                        ))?
+                } else { false },
+
+                // todo: validation with the resources defined in manifest soon
+                text_font: attributes.remove("text").unwrap_or_else(|| "default_font".to_string()),
+
+                text_style: if let Some(text_style) = attributes.remove("text_style") {
+                    parse_text_style(&*text_style, "text_style")?
+                } else { TextType::Normal },
+
+                lines: if let Some(lines) = attributes.remove("lines") {
+                    lines.parse()
+                        .map_err(|err| ViewCompileError::AttributeParseError(
+                            AttributeParseError::InvalidIntValue {
+                                attribute_name: "lines".to_string(),
+                                attribute_value: lines,
+                                err
+                            }
+                        ))?
+                } else { 0 },
+
+                hint: attributes.remove("hint").unwrap_or_else(|| String::new()),
+
+                hint_color: if let Some(hint_color) = attributes.remove("hint_color") {
+                    parse_color(&*hint_color, "hint_color")?
+                } else { Color::from(0x607d8b) }, // #607d8b
+
+                ime_option: if let Some(ime_option) = attributes.remove("ime_option") {
+                    match ime_option.as_str() {
+                        "normal" => ImeOption::Normal,
+                        "none" => ImeOption::None,
+                        "go" => ImeOption::Go,
+                        "search" => ImeOption::Search,
+                        "send" => ImeOption::Send,
+                        "next" => ImeOption::Next,
+                        "done" => ImeOption::Done,
+                        _ => return Err(ViewCompileError::AttributeParseError(
+                            AttributeParseError::InvalidAttributeValue {
+                                attribute_name: "ime_option".to_string(),
+                                attribute_value: ime_option,
+                                possible_values: vec![
+                                    "normal".to_string(), "none".to_string(), "go".to_string(),
+                                    "search".to_string(), "send".to_string(), "next".to_string(),
+                                    "done".to_string()
+                                ]
+                            }
+                        ))
+                    }
+                } else { ImeOption::Normal },
+
+                // see docs/notes.md#Full InputType support?
+                input_type: if let Some(input_type) = attributes.remove("input_type") {
+                    // yes i am too lazy to do `|` shayts, it's only used in one item anyway
+                    match input_type.as_str() {
+                        "decimal" => InputType::NumberDecimal,
+                        "signed" => InputType::NumberSigned,
+                        "decimal_signed" => InputType::NumberSignedDecimal,
+                        "text" => InputType::Text,
+                        "password" => InputType::Password,
+                        "phone" => InputType::Phone,
+                        _ => return Err(ViewCompileError::AttributeParseError(
+                            AttributeParseError::InvalidAttributeValue {
+                                attribute_name: "input_type".to_string(),
+                                attribute_value: input_type,
+                                possible_values: vec![
+                                    "decimal".to_string(), "signed".to_string(),
+                                    "decimal_signed".to_string(), "text".to_string(),
+                                    "password".to_string(), "phone".to_string()
+                                ]
+                            }
+                        ))
+                    }
+                } else { InputType::Text }
+            },
         "ImageView" => todo!(),
         "WebView" => todo!(),
         "ProgressBar" => todo!(),
@@ -384,6 +431,12 @@ only supports in: ffffff, #ffffff, ffffffff, #ffffffff")]
         attribute_value: String,
         err: ParseFloatError
     },
+    #[error("invalid attribute boolean given on attribute `{attribute_name}`: `{attribute_value}`. value can only be `true` or `false`")]
+    InvalidBoolValue {
+        attribute_name: String,
+        attribute_value: String,
+        err: ParseBoolError
+    },
     #[error("invalid attribute value given on attribute `{attribute_name}`: `{attribute_value}`. \
 possible values: `{possible_values:?}`")]
     InvalidAttributeValue {
@@ -410,4 +463,148 @@ the item `{attribute_value_item_incompatible}` is incompatible with \
         attribute_value_item_incompatible: String,
         attribute_value_item_incompatible_with: String,
     },
+}
+
+mod attr_parser {
+    use swrs::color::Color;
+    use swrs::parser::view::models::layout::gravity;
+    use swrs::parser::view::models::layout::gravity::Gravity;
+    use swrs::parser::view::models::text::TextType;
+    use super::ViewCompileError;
+    use super::AttributeParseError;
+
+    pub fn parse_gravity(gravity: &str, attr_name: &str) -> Result<Gravity, ViewCompileError> {
+       let values: Vec<&str> = gravity.split("|").map(|s| s.trim()).collect();
+       let mut result = Gravity(gravity::NONE);
+
+       let mut horizontal_taken = false;
+       let mut vertical_taken = false;
+
+       // errors when an incompatible gravity is specified
+       macro_rules! err_if_taken {
+            ($taken_var:ident,$incompatible:expr,$incompatible_with:expr) => {
+                if $taken_var {
+                    return Err(ViewCompileError::AttributeParseError(
+                        AttributeParseError::IncompatibleAttributeValueItem {
+                            attribute_name: attr_name.to_string(),
+                            attribute_value: gravity.to_string(),
+                            attribute_value_item_incompatible: $incompatible.to_string(),
+                            attribute_value_item_incompatible_with: $incompatible_with.to_string()
+                        }
+                    ))
+                }
+
+                $taken_var = true;
+            };
+       }
+
+       for val in values {
+           result.0 |= match val {
+               "center_horizontal" => gravity::CENTER_HORIZONTAL,
+               "center_vertical" => gravity::CENTER_VERTICAL,
+               "center" => gravity::CENTER,
+               "left" => {
+                   err_if_taken!(horizontal_taken, "left", "right");
+                   gravity::LEFT
+               },
+               "right" => {
+                   err_if_taken!(horizontal_taken, "right", "left");
+                   gravity::RIGHT
+               },
+               "top" => {
+                   err_if_taken!(vertical_taken, "top", "bottom");
+                   gravity::TOP
+               },
+               "bottom" => {
+                   err_if_taken!(vertical_taken, "bottom", "top");
+                   gravity::BOTTOM
+               },
+               other => return Err(ViewCompileError::AttributeParseError(
+                   AttributeParseError::InvalidAttributeValueItem {
+                       attribute_name: "gravity".to_string(),
+                       attribute_value: gravity.to_string(),
+                       attribute_value_item: other.to_string(),
+                       possible_value_items: vec![
+                           "center_horizontal".to_string(), "center_vertical".to_string(),
+                           "center".to_string(),
+                           "left".to_string(), "right".to_string(),
+                           "top".to_string(), "bottom".to_string()
+                       ]
+                   }
+               ))
+           }
+       }
+
+       Ok(result)
+   }
+
+    pub fn parse_color(color: &str, attr_name: &str) -> Result<Color, ViewCompileError> {
+        // supports "ffffff" "#ffffff" "ffffffff" "#ffffffff"
+        if color.len() < 6 || color.len() > 9 {
+            return Err(ViewCompileError::AttributeParseError(
+                AttributeParseError::InvalidColorValue {
+                    attribute_name: attr_name.to_string(),
+                    attribute_value: color.to_string()
+                }
+            ));
+        }
+
+        Ok(Color::parse_hex(if color.len() % 2 == 0 {
+            // this doesn't have a #
+            &*color
+        } else {
+            // this does have a # at the start, check it
+            if &color.chars().nth(0).unwrap() != &'#' {
+                // what this doesn't start with `#`!?
+                return Err(ViewCompileError::AttributeParseError(
+                    AttributeParseError::InvalidColorValue {
+                        attribute_name: attr_name.to_string(),
+                        attribute_value: color.to_string()
+                    }
+                ));
+            }
+
+            &color[1..]
+        }).map_err(|_| ViewCompileError::AttributeParseError(
+            AttributeParseError::InvalidColorValue {
+                attribute_name: attr_name.to_string(),
+                attribute_value: color.to_string()
+            }
+        ))?)
+    }
+
+    pub fn parse_text_style(text_style: &str, attr_name: &str) -> Result<TextType, ViewCompileError> {
+        let values: Vec<&str> =
+            text_style.split("|").map(|s| s.trim()).collect();
+
+        let mut bold = false;
+        let mut italic = false;
+
+        for value in values {
+            match value {
+                "bold" => bold = true,
+                "italic" => italic = true,
+                other => return Err(ViewCompileError::AttributeParseError(
+                    AttributeParseError::InvalidAttributeValueItem {
+                        attribute_name: attr_name.to_string(),
+                        attribute_value: text_style.to_owned(),
+                        attribute_value_item: other.to_string(),
+                        possible_value_items: vec![
+                            "bold".to_string(), "italic".to_string()
+                        ]
+                    }
+                ))
+            }
+        }
+
+        Ok(if bold && italic {
+            TextType::BoldItalic
+        } else if bold {
+            TextType::Bold
+        } else if italic {
+            TextType::Italic
+        } else {
+            TextType::Normal
+        })
+    }
 }
