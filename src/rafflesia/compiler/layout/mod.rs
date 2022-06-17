@@ -1,31 +1,38 @@
 pub mod parser;
 
 use std::collections::HashMap;
-use anyhow::{anyhow, Context, Error, Result};
+use std::num::{ParseFloatError, ParseIntError};
 use thiserror::Error;
 use parser::View;
 use swrs::api::view::{SidesValue, View as SWRSView, ViewType};
 use swrs::color::Color;
 use swrs::parser::view::models::AndroidView;
 use swrs::parser::view::models::layout::{gravity, Orientation, Size};
+use swrs::parser::view::models::layout::gravity::Gravity;
 
 /// Compiles a parsed view into an swrs [`swrs::api::view::View`].
-pub fn compile_view_tree(parsed: View) -> Result<SWRSView> {
+pub fn compile_view_tree(parsed: View) -> Result<SWRSView, ViewCompileError> {
 
-    fn compile(parsed: View, parent_id: &str, parent_type: i8, state: &mut u32) -> Result<SWRSView> {
+    fn compile(parsed: View, parent_id: &str, parent_type: i8, state: &mut u32) -> Result<SWRSView, ViewCompileError> {
         let view_id = if let Some(id) = parsed.view_id { id } else {
             *state += 1;
             format!("view{}", *state - 1)
         };
 
         Ok(if let Some(mut attrs) = parsed.attributes {
-            let view = view_name_to_view_type(parsed.name, &mut attrs)?;
+            let view = map_view_name_attrs(parsed.name, &mut attrs)?;
 
             macro_rules! attr_number_get {
                 ($name:expr,$default:expr) => {
                     if let Some(val) = attrs.remove($name) {
                         val.parse()
-                            .context(format!("invalid number given on field {}", $name))?
+                            .map_err(|err| ViewCompileError::AttributeParseError(
+                                AttributeParseError::InvalidIntValue {
+                                    attribute_name: $name.to_string(),
+                                    attribute_value: val,
+                                    err
+                                }
+                            ))?
                     } else { $default }
                 };
             }
@@ -33,11 +40,17 @@ pub fn compile_view_tree(parsed: View) -> Result<SWRSView> {
             let padding = attrs
                 .remove("padding")
                 .map(|e| {
-                    match e.parse().context("invalid padding value") {
+                    match e.parse() {
                         Ok(val) => Ok(SidesValue {
                             top: val, right: val, bottom: val, left: val
                         }),
-                        Err(err) => Err(err)
+                        Err(err) => Err(ViewCompileError::AttributeParseError(
+                            AttributeParseError::InvalidIntValue {
+                                attribute_name: "margin".to_string(),
+                                attribute_value: e,
+                                err
+                            })
+                        )
                     }
                 })
                 .unwrap_or_else(|| {
@@ -52,11 +65,17 @@ pub fn compile_view_tree(parsed: View) -> Result<SWRSView> {
             let margin = attrs
                 .remove("margin")
                 .map(|e| {
-                    match e.parse().context("invalid margin value") {
+                    match e.parse() {
                         Ok(val) => Ok(SidesValue {
                             top: val, right: val, bottom: val, left: val
                         }),
-                        Err(err) => Err(err)
+                        Err(err) => Err(ViewCompileError::AttributeParseError(
+                            AttributeParseError::InvalidIntValue {
+                                attribute_name: "padding".to_string(),
+                                attribute_value: e,
+                                err
+                            })
+                        )
                     }
                 })
                 .unwrap_or_else(|| {
@@ -72,9 +91,11 @@ pub fn compile_view_tree(parsed: View) -> Result<SWRSView> {
                 background_color: if let Some(color) = attrs.remove("background_color") {
                     // supports "ffffff" "#ffffff" "ffffffff" "#ffffffff"
                     if color.len() < 6 || color.len() > 9 {
-                        return Err(anyhow!(
-                            "unexpected color given on the field background_color: `{}`, can only \
-be hex color codes with the format \"ffffff\", \"#ffffff\", \"ffffffff\" or \"#ffffffff\"", color
+                        return Err(ViewCompileError::AttributeParseError(
+                            AttributeParseError::InvalidColorValue {
+                                attribute_name: "background_color".to_string(),
+                                attribute_value: color
+                            }
                         ));
                     }
 
@@ -84,7 +105,12 @@ be hex color codes with the format \"ffffff\", \"#ffffff\", \"ffffffff\" or \"#f
                     } else {
                         // this does have a # at the start
                         &color[1..]
-                    })?
+                    }).map_err(|_| ViewCompileError::AttributeParseError(
+                        AttributeParseError::InvalidColorValue {
+                            attribute_name: "background_color".to_string(),
+                            attribute_value: color
+                        }
+                    ))?
                 } else { Color::from(0xFFFFFF) },
                 height: if let Some(height) = attrs.remove("height") {
                     match height.as_str() {
@@ -92,8 +118,12 @@ be hex color codes with the format \"ffffff\", \"#ffffff\", \"ffffffff\" or \"#f
                         "wrap_content" => Size::WrapContent,
                         _ => Size::Fixed(
                             height.parse()
-                                .context(format!(
-                                    "Failed to convert height value `{}` to an integer", height
+                                .map_err(|err| ViewCompileError::AttributeParseError(
+                                    AttributeParseError::InvalidIntValue {
+                                        attribute_name: "height".to_string(),
+                                        attribute_value: height,
+                                        err
+                                    }
                                 ))?
                         )
                     }
@@ -104,8 +134,12 @@ be hex color codes with the format \"ffffff\", \"#ffffff\", \"ffffffff\" or \"#f
                         "wrap_content" => Size::WrapContent,
                         _ => Size::Fixed(
                             width.parse()
-                                .context(format!(
-                                    "Failed to convert height value `{}` to an integer", width
+                                .map_err(|err| ViewCompileError::AttributeParseError(
+                                    AttributeParseError::InvalidIntValue {
+                                        attribute_name: "width".to_string(),
+                                        attribute_value: width,
+                                        err
+                                    }
                                 ))?
                         )
                     }
@@ -122,7 +156,7 @@ be hex color codes with the format \"ffffff\", \"#ffffff\", \"ffffffff\" or \"#f
             }
         } else {
             // when there's no attributes provided
-            let view = view_name_to_view_type(parsed.name, &mut HashMap::new())?;
+            let view = map_view_name_attrs(parsed.name, &mut HashMap::new())?;
 
             SWRSView {
                 id: view_id.to_string(),
@@ -145,8 +179,23 @@ be hex color codes with the format \"ffffff\", \"#ffffff\", \"ffffffff\" or \"#f
     compile(parsed, "root", 0, &mut 0u32)
 }
 
-fn view_name_to_view_type(name: String, attributes: &mut HashMap<String, String>)
-    -> core::result::Result<ViewType, ViewNameConversionError> {
+#[derive(Debug, Error)]
+pub enum ViewCompileError {
+    #[error("unknown view: `{view_name}`")]
+    UnknownView {
+        view_name: String
+    },
+
+    #[error("error on attribute parsing: {0}")]
+    AttributeParseError(AttributeParseError),
+}
+
+/// This function maps attributes depending on the view name into the enum [`ViewType`].
+///
+/// The enum contains view-name-specific attributes, for instance: text for TextView, checked for
+/// CheckBoxes
+fn map_view_name_attrs(name: String, attributes: &mut HashMap<String, String>)
+    -> Result<ViewType, ViewCompileError> {
 
     Ok(match name.as_str() {
         "LinearLayout" => {
@@ -155,18 +204,19 @@ fn view_name_to_view_type(name: String, attributes: &mut HashMap<String, String>
                     match orientation.as_str() {
                         "vertical" => Orientation::Vertical,
                         "horizontal" => Orientation::Horizontal,
-                        _ => return Err(ViewNameConversionError::InvalidAttributeValue {
-                            view_name: name,
-                            attribute_name: "orientation".to_string(),
-                            attribute_value: orientation,
-                            possible_values: vec!["vertical".to_string(), "horizontal".to_string()]
-                        })
+                        _ => return Err(ViewCompileError::AttributeParseError(
+                            AttributeParseError::InvalidAttributeValue {
+                                attribute_name: "orientation".to_string(),
+                                attribute_value: orientation,
+                                possible_values: vec!["vertical".to_string(), "horizontal".to_string()]
+                            })
+                        )
                     }
                 } else { Orientation::Vertical }, // default is vertical if no orientation specified
 
                 gravity: if let Some(gravity) = attributes.remove("gravity") {
                     let values: Vec<&str> = gravity.split("|").map(|s| s.trim()).collect();
-                    let mut result = gravity::Gravity(gravity::NONE);
+                    let mut result = Gravity(gravity::NONE);
 
                     let mut horizontal_taken = false;
                     let mut vertical_taken = false;
@@ -175,13 +225,14 @@ fn view_name_to_view_type(name: String, attributes: &mut HashMap<String, String>
                     macro_rules! err_if_taken {
                         ($taken_var:ident,$incompatible:expr,$incompatible_with:expr) => {
                             if $taken_var {
-                                return Err(ViewNameConversionError::IncompatibleAttributeValueItem {
-                                    view_name: name,
-                                    attribute_name: "gravity".to_string(),
-                                    attribute_value: gravity,
-                                    attribute_value_item_incompatible: $incompatible.to_string(),
-                                    attribute_value_item_incompatible_with: $incompatible_with.to_string()
-                                })
+                                return Err(ViewCompileError::AttributeParseError(
+                                    AttributeParseError::IncompatibleAttributeValueItem {
+                                        attribute_name: "gravity".to_string(),
+                                        attribute_value: gravity,
+                                        attribute_value_item_incompatible: $incompatible.to_string(),
+                                        attribute_value_item_incompatible_with: $incompatible_with.to_string()
+                                    }
+                                ))
                             }
 
                             $taken_var = true;
@@ -209,23 +260,24 @@ fn view_name_to_view_type(name: String, attributes: &mut HashMap<String, String>
                                 err_if_taken!(vertical_taken, "bottom", "top");
                                 gravity::BOTTOM
                             },
-                            _ => return Err(ViewNameConversionError::InvalidAttributeValueItem {
-                                view_name: name,
-                                attribute_name: "gravity".to_string(),
-                                attribute_value: gravity.to_string(),
-                                attribute_value_item: val.to_string(),
-                                possible_value_items: vec![
-                                    "center_horizontal".to_string(), "center_vertical".to_string(),
-                                    "center".to_string(),
-                                    "left".to_string(), "right".to_string(),
-                                    "top".to_string(), "bottom".to_string()
-                                ]
-                            })
+                            _ => return Err(ViewCompileError::AttributeParseError(
+                                AttributeParseError::InvalidAttributeValueItem {
+                                    attribute_name: "gravity".to_string(),
+                                    attribute_value: gravity.to_string(),
+                                    attribute_value_item: val.to_string(),
+                                    possible_value_items: vec![
+                                        "center_horizontal".to_string(), "center_vertical".to_string(),
+                                        "center".to_string(),
+                                        "left".to_string(), "right".to_string(),
+                                        "top".to_string(), "bottom".to_string()
+                                    ]
+                                }
+                            ))
                         }
                     }
 
                     result
-                } else { gravity::Gravity(gravity::NONE) }
+                } else { Gravity(gravity::NONE) }
             }
         },
         "ScrollView" => todo!(),
@@ -245,16 +297,33 @@ fn view_name_to_view_type(name: String, attributes: &mut HashMap<String, String>
         "Fab" => todo!(),
         "AdView" => todo!(),
         "MapView" => todo!(),
-        _ => return Err(ViewNameConversionError::UnknownView { view_name: name })
+        _ => return Err(ViewCompileError::UnknownView { view_name: name })
     })
 }
 
 #[derive(Error, Debug)]
-pub enum ViewNameConversionError {
+pub enum AttributeParseError {
+    #[error("invalid attribute color value given on attribute `{attribute_name}`: `{attribute_value}`. \
+only supports in: ffffff, #ffffff, ffffffff, #ffffffff")]
+    InvalidColorValue {
+        attribute_name: String,
+        attribute_value: String,
+    },
+    #[error("invalid attribute int value given on attribute `{attribute_name}`: `{attribute_value}`. error: {err}")]
+    InvalidIntValue {
+        attribute_name: String,
+        attribute_value: String,
+        err: ParseIntError
+    },
+    #[error("invalid attribute float/number value given on attribute `{attribute_name}`: `{attribute_value}`. error: {err}")]
+    InvalidFloatValue {
+        attribute_name: String,
+        attribute_value: String,
+        err: ParseFloatError
+    },
     #[error("invalid attribute value given on attribute `{attribute_name}`: `{attribute_value}`. \
 possible values: `{possible_values:?}`")]
     InvalidAttributeValue {
-        view_name: String,
         attribute_name: String,
         attribute_value: String,
         possible_values: Vec<String>,
@@ -263,25 +332,19 @@ possible values: `{possible_values:?}`")]
 `{attribute_value_item}`, full value: `{attribute_value}`. possible value items: \
 `{possible_value_items:?}`")]
     InvalidAttributeValueItem {
-        view_name: String,
         attribute_name: String,
         attribute_value: String,
         attribute_value_item: String,
         possible_value_items: Vec<String>
     },
     #[error("incompatible attribute value given on attribute \
-`{attribute_name}`: `{attribute_value_item_incompatible}`, full value: `attribute_value`. \
+`{attribute_name}`: `{attribute_value_item_incompatible}`, full value: `{attribute_value}`. \
 the item `{attribute_value_item_incompatible}` is incompatible with \
 `{attribute_value_item_incompatible_with}`")]
     IncompatibleAttributeValueItem {
-        view_name: String,
         attribute_name: String,
         attribute_value: String,
         attribute_value_item_incompatible: String,
         attribute_value_item_incompatible_with: String,
     },
-    #[error("unknown view: `{view_name}`")]
-    UnknownView {
-        view_name: String
-    }
 }
