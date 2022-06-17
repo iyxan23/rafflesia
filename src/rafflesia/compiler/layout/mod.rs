@@ -148,7 +148,70 @@ pub fn compile_view_tree(parsed: View) -> Result<SWRSView, ViewCompileError> {
                 margin,
                 weight: attr_number_get!("weight", 0),
                 weight_sum: attr_number_get!("weight_sum", 0),
-                layout_gravity: Default::default(),
+                layout_gravity: if let Some(layout_gravity) = attrs.remove("layout_gravity") {
+                    let values: Vec<&str> = layout_gravity.split("|").map(&str::trim).collect();
+                    let mut result = Gravity(gravity::NONE);
+
+                    let mut horizontal_taken = false;
+                    let mut vertical_taken = false;
+
+                    // errors when an incompatible gravity is specified
+                    macro_rules! err_if_taken {
+                        ($taken_var:ident,$incompatible:expr,$incompatible_with:expr) => {
+                            if $taken_var {
+                                return Err(ViewCompileError::AttributeParseError(
+                                    AttributeParseError::IncompatibleAttributeValueItem {
+                                        attribute_name: "gravity".to_string(),
+                                        attribute_value: layout_gravity,
+                                        attribute_value_item_incompatible: $incompatible.to_string(),
+                                        attribute_value_item_incompatible_with: $incompatible_with.to_string()
+                                    }
+                                ));
+                            }
+
+                            $taken_var = true;
+                        };
+                    }
+
+                    for val in values {
+                        result.0 |= match val {
+                            "center_horizontal" => gravity::CENTER_HORIZONTAL,
+                            "center_vertical" => gravity::CENTER_VERTICAL,
+                            "center" => gravity::CENTER,
+                            "left" => {
+                                err_if_taken!(horizontal_taken, "left", "right");
+                                gravity::LEFT
+                            },
+                            "right" => {
+                                err_if_taken!(horizontal_taken, "right", "left");
+                                gravity::RIGHT
+                            },
+                            "top" => {
+                                err_if_taken!(vertical_taken, "top", "bottom");
+                                gravity::TOP
+                            },
+                            "bottom" => {
+                                err_if_taken!(vertical_taken, "bottom", "top");
+                                gravity::BOTTOM
+                            },
+                            other => return Err(ViewCompileError::AttributeParseError(
+                                AttributeParseError::InvalidAttributeValueItem {
+                                    attribute_name: "layout_gravity".to_string(),
+                                    attribute_value: layout_gravity.to_owned(),
+                                    attribute_value_item: other.to_string(),
+                                    possible_value_items: vec![
+                                        "center_horizontal".to_string(), "center_vertical".to_string(),
+                                        "center".to_string(),
+                                        "left".to_string(), "right".to_string(),
+                                        "top".to_string(), "bottom".to_string()
+                                    ],
+                                }
+                            ))
+                        }
+                    }
+
+                    result
+                } else { Gravity::default() },
                 children: vec![],
                 raw: AndroidView::new_empty(view_id.as_str(), view.get_type_id(), parent_id, parent_type),
                 id: view_id,
