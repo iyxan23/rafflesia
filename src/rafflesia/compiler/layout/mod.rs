@@ -1,5 +1,8 @@
 pub mod parser;
 
+#[cfg(test)]
+mod tests;
+
 use std::collections::HashMap;
 use std::num::{ParseFloatError, ParseIntError};
 use std::str::ParseBoolError;
@@ -13,6 +16,8 @@ use swrs::parser::view::models::layout::{gravity, Orientation, Size};
 use swrs::parser::view::models::layout::gravity::Gravity;
 use swrs::parser::view::models::text::{ImeOption, InputType, TextType};
 use crate::compiler::layout::attr_parser::{parse_color, parse_gravity, parse_text_style};
+
+// todo: use position stuff so we can pinpoint exactly where an error come from
 
 /// Compiles a parsed view into an swrs [`swrs::api::view::View`].
 pub fn compile_view_tree(parsed: View) -> Result<SWRSView, ViewCompileError> {

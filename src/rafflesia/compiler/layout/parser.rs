@@ -21,7 +21,7 @@ pub fn parse_layout(raw: &str) -> Result<View, parser::LayoutParseError> {
 
 mod parser {
     use std::collections::HashMap;
-    use crate::compiler::parser::{error, LexerWrapper, TokenWrapper, TokenWrapperOwned};
+    use crate::compiler::parser::{error, LexerWrapper, TokenWrapperOwned};
     use super::View;
     use logos::Logos;
 
@@ -191,28 +191,5 @@ mod parser {
 
         lexer.success();
         Ok(result)
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::parse_layout;
-
-    #[test]
-    fn simple() {
-        let input =
-r#"LinearLayout (hello: "world") {
-    TextView (text: hi): myText,
-
-    // ignore this comment!
-    TextView (
-        "another": "text",
-        trailing: comma,
-    ),
-}"#;
-        let result = parse_layout(input).unwrap();
-
-        // todo: assert
-        println!("{:?}", result);
     }
 }
