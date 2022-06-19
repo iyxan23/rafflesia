@@ -667,7 +667,7 @@ fn atom(lex: &mut Lexer) -> LogicParseResult<Expression> {
         }
         TokenWrapperOwned { token: Token::Number, slice, pos } => {
             let num = slice.parse::<f64>()
-                .map_err(|e| ParseError::LexerError {
+                .map_err(|_| ParseError::LexerError {
                     err_token: Token::Number,
                     pos: pos.clone(),
                     slice: slice.to_string(),

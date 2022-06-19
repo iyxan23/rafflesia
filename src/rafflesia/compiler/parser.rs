@@ -427,7 +427,7 @@ pub mod error {
                                 "expected a {}, got {:?} instead",
                                 e.iter()
                                     .fold(String::new(), |acc, tok| {
-                                        format!("{:?} or", tok)
+                                        format!("{} or {:?}", acc, tok)
                                     })[..3].to_string(), // removes the trailing ` or`
                                 unexpected_token
                             )
@@ -450,7 +450,7 @@ pub mod error {
                                 "expected a {}, but reached end-of-file",
                                 expected.iter()
                                     .fold(String::new(), |acc, tok| {
-                                        format!("{:?} or", tok)
+                                        format!("{} or {:?}", acc, tok)
                                     })[..3].to_string(), // removes the trailing ` or`
                             )
                         }
