@@ -134,7 +134,19 @@ pub fn compile_view_tree(parsed: View) -> Result<SWRSView, ViewCompileError> {
                 layout_gravity: if let Some(layout_gravity) = attrs.remove("layout_gravity") {
                     parse_gravity(&*layout_gravity, "layout_gravity")?
                 } else { Gravity::default() },
-                children: vec![],
+                children: if let Some(children) = parsed.children {
+                    children.into_iter()
+                        .enumerate()
+                        .map(|(index, v)| {
+                            compile(v, &*view_id,
+                                    view.get_type_id() as i8, state)
+                                .map_err(|e| ViewCompileError::ChildCompileError {
+                                    index,
+                                    source: Box::new(e)
+                                })
+                        })
+                        .collect::<Result<Vec<_>, _>>()?
+                } else { vec![] },
                 raw: AndroidView::new_empty(view_id.as_str(), view.get_type_id(), parent_id, parent_type),
                 id: view_id,
                 view: Ok(view),
@@ -169,6 +181,12 @@ pub enum ViewCompileError {
     #[error("unknown view: `{view_name}`")]
     UnknownView {
         view_name: String
+    },
+
+    #[error("error on compiling a child at index {index}")]
+    ChildCompileError {
+        index: usize,
+        source: Box<ViewCompileError>
     },
 
     #[error("error on attribute parsing: {0}")]
