@@ -68,7 +68,7 @@ pub enum Token {
     #[token("false")] False,
 
     #[regex(r#""([^"]|\\")*""#)] String,
-    #[regex("[0-9]+(?:\\.[0-9]+)")] Number,
+    #[regex("[0-9]+(?:\\.[0-9]+)?")] Number,
 
     #[regex(r"[a-zA-Z_][a-zA-Z0-9_]*")] Identifier,
 
