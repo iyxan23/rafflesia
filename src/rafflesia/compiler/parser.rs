@@ -273,14 +273,24 @@ impl<'source, T> LexerWrapper<'source, T>
         Ok(next)
     }
 
-    /// Peeks one token ahead, and expects a token. Then go back no matter what
+    /// Peeks one token ahead, and expects a token. Then go back if the error is recoverable
+    /// (unexpected token)
     pub fn expect_peek(&mut self, tok: T)
         -> Result<TokenWrapperOwned<T>, error::ParseError<T, TokenWrapperOwned<T>>> {
 
         trace!("{} - expect_peeking {:?}", "  ".repeat(self.save_points.len()), tok);
 
         let res = self.expect(tok);
-        let _ = self.previous().unwrap();
+
+        // only go previous when the error is recoverable (an unexpected token)
+        // will not go previous when there is an error token or an EOF
+        if let Err(err) = &res {
+            if err.is_recoverable() {
+                let _ = self.previous().unwrap();
+            }
+        } else {
+            let _ = self.previous().unwrap();
+        }
 
         res
     }
