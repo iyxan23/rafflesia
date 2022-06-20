@@ -93,7 +93,13 @@ impl<'source, T> LexerWrapper<'source, T>
         if self.index >= self.inner_index {
             // yep, this is up-to-date! go next and save it to the cache
             let next_token = self.inner.next()
-                .ok_or_else(|| error::ParseError::EOF { expected: None })?;
+                .ok_or_else(|| {
+                    trace!(
+                        "{} * encountered eof (now {}, inner {})",
+                        "  ".repeat(self.save_points.len()), self.index, self.inner_index
+                    );
+                    error::ParseError::EOF { expected: None }
+                })?;
 
             // check if this is an error token
             if self.err_tok == next_token {
@@ -112,7 +118,13 @@ impl<'source, T> LexerWrapper<'source, T>
             });
 
             let ret = self.cached_tokens.get(self.index - self.cache_start_point)
-                .ok_or_else(|| error::ParseError::EOF { expected: None })?;
+                .ok_or_else(|| {
+                    trace!(
+                        "{} * encountered eof (now {}, inner {})",
+                        "  ".repeat(self.save_points.len()), self.index, self.inner_index
+                    );
+                    error::ParseError::EOF { expected: None }
+                })?;
 
             self.index += 1;
             self.inner_index += 1;
@@ -164,14 +176,35 @@ impl<'source, T> LexerWrapper<'source, T>
         }
     }
 
-    /// Checks if the next token is as the token given, then return the token; otherwise it will
-    /// call [`LexerWrapper::previous`] to go back.
-    // fixme: LexerError doesnt get propagated
+    /// Checks if the next token is as the token given, then return the token. Otherwise, go back
+    /// when the error is unexpected token. Will not go back when the errors are either LexerError
+    /// or EOF
+    // fixme: LexerError doesnt get propagated, this is a really bad function
     pub fn expect_failsafe(&mut self, tok: T) -> Option<TokenWrapperOwned<T>> {
-        if let Ok(res) = self.expect(tok) { Some(res) } else {
-            self.previous();
+        trace!("{} - expecting [failsafe] {:?}", "  ".repeat(self.save_points.len()), tok);
 
-            None
+        match self.expect(tok) {
+            Ok(res) => {
+                trace!("{} - expected [failsafe] {:?}", "  ".repeat(self.save_points.len()), &res);
+
+                Some(res)
+            }
+
+            Err(err) => {
+                // only go back when the error is recoverable (unexpected token)
+                // we cannot go back on errors like EOF and LexerError
+                if err.is_recoverable() {
+                    trace!("{} v unexpected [failsafe]", "  ".repeat(self.save_points.len()));
+                    self.previous();
+                } else {
+                    trace!(
+                        "{} v unexpected [failsafe] irrecoverable err: {}",
+                        "  ".repeat(self.save_points.len()), err
+                    );
+                }
+
+                None
+            }
         }
     }
 
