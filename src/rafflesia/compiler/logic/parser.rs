@@ -344,6 +344,7 @@ fn if_statement(lex: &mut Lexer) -> LogicParseResult<IfStatement> {
         Some(else_body)
     } else { None };
 
+    lex.success();
     Ok(IfStatement {
         condition,
         body,
@@ -397,6 +398,7 @@ fn expression(lex: &mut Lexer) -> LogicParseResult<Expression> {
         return Ok(expr);
     }
 
+    lex.success();
     // fixme: i have no idea what to return here, we can't have two different errors to be returned.
     // i feel like this atom branch is unnecessary since it should already been checked inside the
     // many call stacks of bool_expr
@@ -642,6 +644,7 @@ fn arguments(lex: &mut Lexer) -> LogicParseResult<Arguments> {
         arguments.push(expression(lex)?);
     }
 
+    lex.success();
     Ok(Arguments(arguments))
 }
 
