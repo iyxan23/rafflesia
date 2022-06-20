@@ -514,7 +514,7 @@ fn arithmetic_expression(lex: &mut Lexer) -> LogicParseResult<Expression> {
 fn term(lex: &mut Lexer) -> LogicParseResult<Expression> {
     lex.start();
 
-    let first_branch = term(lex)?;
+    let first_branch = factor(lex)?;
     let mut result = first_branch;
 
     while let Ok(tok) =
@@ -524,7 +524,7 @@ fn term(lex: &mut Lexer) -> LogicParseResult<Expression> {
         let _ = lex.next();
 
         let operator = token_to_binop!(tok, { Mult => Multiply, Div => Divide });
-        let second_branch = term(lex)?;
+        let second_branch = factor(lex)?;
 
         result = Expression::BinOp {
             first: Box::new(result),
