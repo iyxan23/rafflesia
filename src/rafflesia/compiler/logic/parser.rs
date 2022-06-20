@@ -462,14 +462,14 @@ fn comparison_expression(lex: &mut Lexer) -> LogicParseResult<Expression> {
 
     while let Ok(tok) =
         lex.expect_peek_multiple_choices(vec![
-            Token::LT, Token::GT, Token::EQ, Token::LTE, Token::GTE
+            Token::LT, Token::GT, Token::DEQ, Token::LTE, Token::GTE
         ]) {
 
         // skip the next token because we've peeked it
         let _ = lex.next();
 
         let operator = token_to_binop!(tok, {
-            LT => LT,GT => GT, EQ => EQ, LTE => LTE, GTE => GTE
+            LT => LT,GT => GT, DEQ => EQ, LTE => LTE, GTE => GTE
         });
 
         let second_branch = comparison_expression(lex)?;
