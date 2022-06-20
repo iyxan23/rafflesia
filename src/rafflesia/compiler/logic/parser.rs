@@ -299,7 +299,9 @@ fn inner_statement(lex: &mut Lexer) -> LogicParseResult<InnerStatement> {
                     })
                 } else {
                     // todo: implement from.name = value
-                    unimplemented!()
+                    InnerStatement::Expression(Expression::PrimaryExpression(
+                        PrimaryExpression::VariableAccess { from, name }
+                    ))
                 }
             } else {
                 // todo: be able to do stuff like list[index] = value
@@ -605,6 +607,7 @@ fn primary(lex: &mut Lexer) -> LogicParseResult<Expression> {
             }
             TokenWrapperOwned { token: Token::LBracket, .. } => {
                 let index_expr = expression(lex)?;
+                lex.expect(Token::RBracket)?;
 
                 result = Expression::PrimaryExpression(PrimaryExpression::Index {
                     from: Box::new(result),
@@ -613,6 +616,7 @@ fn primary(lex: &mut Lexer) -> LogicParseResult<Expression> {
             }
             TokenWrapperOwned { token: Token::LParen, .. } => {
                 let arguments = arguments(lex)?;
+                lex.expect(Token::RParen)?;
 
                 result = Expression::PrimaryExpression(PrimaryExpression::Call {
                     from: Box::new(result),
@@ -630,7 +634,7 @@ fn primary(lex: &mut Lexer) -> LogicParseResult<Expression> {
 fn arguments(lex: &mut Lexer) -> LogicParseResult<Arguments> {
     lex.start();
 
-    if lex.expect_failsafe(Token::RParen).is_some() {
+    if error::propagate_non_recoverable!(lex.expect_peek(Token::RParen)).is_ok() {
         return Ok(Arguments(vec![]));
     }
 
@@ -640,7 +644,11 @@ fn arguments(lex: &mut Lexer) -> LogicParseResult<Arguments> {
     arguments.push(first);
 
     while lex.expect_failsafe(Token::Comma).is_some() {
-        if lex.expect_peek(Token::RParen).is_ok() { break; }
+        let r_paren = error::propagate_non_recoverable!(lex.expect(Token::RParen));
+        lex.previous().unwrap();
+        if r_paren.is_ok() { break; }
+
+        lex.previous().unwrap();
         arguments.push(expression(lex)?);
     }
 
