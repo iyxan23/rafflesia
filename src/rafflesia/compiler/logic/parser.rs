@@ -78,7 +78,7 @@ pub enum Token {
     Error
 }
 
-pub type LogicParseError = error::ParseError<Token, TokenWrapperOwned<Token>>;
+pub type LogicParseError = ParseError<Token, TokenWrapperOwned<Token>>;
 pub type LogicParseResult<T> = Result<T, LogicParseError>;
 type Lexer<'a> = LexerWrapper<'a, Token>;
 
@@ -97,15 +97,12 @@ fn outer_statements(lex: &mut Lexer) -> LogicParseResult<OuterStatements> {
         while let Some(_) = lex.expect_failsafe(Token::Newline) {}
 
         // break if we've reached EOF, but propagate lexer errors
-        match lex.peek() {
-            Err(err) => {
-                match err {
-                    ParseError::EOF { .. } => break,
-                    ParseError::LexerError { .. } => return Err(err),
-                    _ => unreachable!()
-                }
+        if let Err(err) = lex.peek() {
+            match err {
+                ParseError::EOF { .. } => break,
+                ParseError::LexerError { .. } => return Err(err),
+                _ => unreachable!()
             }
-            _ => ()
         }
 
         statements.0.push(outer_statement(lex)?);
@@ -257,8 +254,8 @@ fn inner_statements(lex: &mut Lexer) -> LogicParseResult<InnerStatements> {
         while let Some(_) = lex.expect_failsafe(Token::Newline) {}
 
         // check if we've reached the end (a closing brace)
-        // todo: change this when there's an Error token detection in LexerWrapper
-        if let Ok(_) = lex.expect_peek(Token::RBrace) { break; }
+        let res = error::propagate_non_recoverable!(lex.expect_peek(Token::RBrace));
+        if res.is_ok() { break; }
 
         statements.0.push(inner_statement(lex)?);
     }
@@ -447,7 +444,7 @@ fn comparison_expression(lex: &mut Lexer) -> LogicParseResult<Expression> {
     lex.start();
 
     // "!" comparison-expression
-    if lex.expect_failsafe(Token::Not).is_some() {
+    if error::propagate_non_recoverable!(lex.expect_peek(Token::Not)).is_ok() {
         let expr = arithmetic_expression(lex)?;
 
         lex.success();
