@@ -671,7 +671,7 @@ fn atom(lex: &mut Lexer) -> LogicParseResult<Expression> {
         }
         TokenWrapperOwned { token: Token::String, slice, .. } => {
             lex.success();
-            Ok(Expression::Literal(Literal::String(slice[1..slice.len()].to_string())))
+            Ok(Expression::Literal(Literal::String(slice[1..slice.len() - 1].to_string())))
         }
         TokenWrapperOwned { token: Token::Number, slice, pos } => {
             let num = slice.parse::<f64>()
