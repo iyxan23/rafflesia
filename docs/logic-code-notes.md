@@ -14,6 +14,10 @@ Random notes and future plans about the logic language.
         3: toast "toast %s" ("Hello world!") color="#ffffff"
     }
     ```
- 4. Module system for logic files, imagine importing moreblocks and custom components (when/if it will support sw mod).
- 5. Cool macro funsies, I might want to take a similar approach to rust; which is by separating procedural macros into a
+ 3. Module system for logic files, imagine importing moreblocks and custom components (when/if it will support sw mod).
+ 4. Cool macro funsies, I might want to take a similar approach to rust; which is by separating procedural macros into a
     separate module.
+ 5. listmap aint here
+ 6. also maps cant have types, perhaps this is an oppurtunity to implement some kind of type safety in rafflesia while
+    they get compiled down to the same code
+ 7. moreblocks wen
