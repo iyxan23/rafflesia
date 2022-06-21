@@ -275,8 +275,15 @@ fn inner_statement(lex: &mut Lexer) -> LogicParseResult<InnerStatement> {
         TokenWrapperOwned { token: Token::Forever, .. } =>
             InnerStatement::ForeverStatement(forever_statement(lex)?),
 
-        TokenWrapperOwned { token: Token::Break, .. } => InnerStatement::Break,
-        TokenWrapperOwned { token: Token::Continue, .. } => InnerStatement::Continue,
+        TokenWrapperOwned { token: Token::Break, .. } => {
+            lex.next().unwrap();
+            InnerStatement::Break
+        },
+
+        TokenWrapperOwned { token: Token::Continue, .. } => {
+            lex.next().unwrap();
+            InnerStatement::Continue
+        },
 
         TokenWrapperOwned { .. } => {
             // can either be variable assignment or an expression (that can be a function or
@@ -326,6 +333,7 @@ fn variable_assignment(lex: &mut Lexer) -> LogicParseResult<VariableAssignment> 
     Ok(VariableAssignment { identifier, value })
 }
 
+// todo: else ifs
 fn if_statement(lex: &mut Lexer) -> LogicParseResult<IfStatement> {
     lex.start();
 
