@@ -1,9 +1,11 @@
+use std::process::{ExitCode, Termination};
 use anyhow::{Result, Context};
 use clap::{AppSettings, Command};
+use console::style;
 
 mod commands;
 
-fn main() -> Result<()> {
+fn try_main() -> Result<()> {
     let args = Command::new("rafflesia")
         .about("A simple language for sketchware projects")
         .setting(AppSettings::DeriveDisplayOrder)
@@ -20,4 +22,21 @@ fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+fn main() -> ExitCode {
+    if let Err(err) = try_main() {
+        eprintln!("{} {}", style("error:").bold().red(), err);
+        eprintln!();
+        eprintln!("Caused by:");
+        err.chain().skip(1)
+            .for_each(|err_item| {
+                eprintln!("    {}", err_item);
+            });
+        eprintln!();
+
+        ExitCode::FAILURE
+    } else {
+        ExitCode::SUCCESS
+    }
 }

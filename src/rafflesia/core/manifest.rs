@@ -5,14 +5,14 @@ use serde::{Serialize, Deserialize};
 use toml::value::Datetime;
 
 // The structure of a swproj.toml file
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Manifest {
     pub project: ProjectTable,
     pub activity: HashMap<String, ActivityTable>,
     pub library: Option<LibraryTable>
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct ProjectTable {
     pub id: Option<u16>,
@@ -26,7 +26,7 @@ pub struct ProjectTable {
     pub colors: Option<ColorsTable>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct ColorsTable {
     pub primary: String,
@@ -36,13 +36,13 @@ pub struct ColorsTable {
     pub control_highlight: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ActivityTable {
     pub logic: String,
     pub layout: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct LibraryTable {
     pub compat: Option<CompatLibraryTable>,
@@ -51,26 +51,26 @@ pub struct LibraryTable {
     pub google_map: Option<GoogleMapLibraryTable>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CompatLibraryTable {
     pub enabled: bool
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct FirebaseLibraryTable {
     pub enabled: bool,
     pub api_key: String
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct AdMobLibraryTable {
     pub enabled: bool,
     pub test_devices: Vec<String>
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct GoogleMapLibraryTable {
     pub enabled: bool,

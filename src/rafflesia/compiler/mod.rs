@@ -1,3 +1,3 @@
 pub mod logic;
 pub mod layout;
-mod parser;
+pub mod parser;
