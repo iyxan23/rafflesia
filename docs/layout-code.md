@@ -57,6 +57,9 @@ LinearLayout (
 }
 ```
 
+Views that aren't specified with IDs will get an id of `view{num}` with num increasing on each view. Do not rely on
+these auto-generated view IDs in your logic code as they can change as the layout changes
+
 ### Global view access
 
 Global view access is a connection between the layout bound to an activity with its logic. It allows logic code to

@@ -6,12 +6,12 @@ Demo:
 number counter
 
 onCreate {
-  display.setTextColor("#000000")
+    display.setTextColor("#000000")
 }
 
 button.onClick {
-  counter += 1
-  display.setText(counter)
+    counter += 1
+    display.setText(counter)
 }
 ```
 
@@ -31,7 +31,7 @@ Example project structure:
 Its toml structure is described in this example:
 ```toml
 [project]
-id = 600                       # local id, will be ommited on a generated project
+id = 600                       # optional local id, will be ommited on a generated project
 name = "My Project"            # the app name
 workspace-name = "MyProject"
 package = "com.my.project"
