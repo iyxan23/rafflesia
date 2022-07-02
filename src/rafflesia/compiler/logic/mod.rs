@@ -9,10 +9,7 @@ use swrs::parser::logic::variable::{Variable, VariableType as SWRSVariableType};
 use swrs::LinkedHashMap;
 use thiserror::Error;
 
-use crate::compiler::logic::ast::{
-    BinaryOperator, ComplexVariableType, Expression, InnerStatement, InnerStatements, Literal,
-    OuterStatement, OuterStatements, UnaryOperator, VariableType
-};
+use crate::compiler::logic::ast::{BinaryOperator, ComplexVariableType, Expression, InnerStatement, InnerStatements, Literal, OuterStatement, OuterStatements, PrimaryExpression, UnaryOperator, VariableType};
 
 pub mod parser;
 pub mod ast;
@@ -25,7 +22,7 @@ mod tests;
 // todo: a custom result handling system similar to error-stack
 
 /// Compiles a logic AST into blocks
-pub fn compile_screen(statements: OuterStatements, attached_layout: &View)
+pub fn compile_logic(statements: OuterStatements, attached_layout: &View)
     -> Result<LogicCompileResult, LogicCompileError> {
 
     let mut variables = LinkedHashMap::new();
@@ -109,16 +106,14 @@ fn compile_inner_statements(stmts: InnerStatements) -> Result<Blocks, LogicCompi
             InnerStatement::ForeverStatement(_) => {}
             InnerStatement::Break => result.push(blocks::r#break()),
             InnerStatement::Continue => result.push(blocks::r#continue()),
-            InnerStatement::Expression(expr) => result.append(&mut compile_expression(expr)?),
+            InnerStatement::Expression(expr) => result.push(compile_expression(expr)?),
         }
     }
 
     Ok(Blocks(result))
 }
 
-fn compile_expression(expr: Expression) -> Result<Vec<Block>, LogicCompileError> {
-    let mut result = Vec::new();
-
+fn compile_expression(expr: Expression) -> Result<Block, LogicCompileError> {
     enum Value {
         Block(Block),
         Literal(Literal),
@@ -184,19 +179,18 @@ fn compile_expression(expr: Expression) -> Result<Vec<Block>, LogicCompileError>
                 let second = compile_expr(*second)?;
 
                 let block = match operator {
-                    BinaryOperator::Or =>
-                        blocks::or(first.to_bool_arg()?, second.to_bool_arg()?),
-                    BinaryOperator::And => todo!(),
-                    BinaryOperator::LT => todo!(),
-                    BinaryOperator::LTE => todo!(),
-                    BinaryOperator::GT => todo!(),
-                    BinaryOperator::GTE => todo!(),
-                    BinaryOperator::EQ => todo!(),
-                    BinaryOperator::Plus => todo!(),
-                    BinaryOperator::Minus => todo!(),
-                    BinaryOperator::Multiply => todo!(),
-                    BinaryOperator::Divide => todo!(),
-                    BinaryOperator::Power => todo!()
+                    BinaryOperator::Or       => blocks::or(first.to_bool_arg()?, second.to_bool_arg()?),
+                    BinaryOperator::And      => blocks::and(first.to_bool_arg()?, second.to_bool_arg()?),
+                    BinaryOperator::LT       => blocks::lt(first.to_bool_arg()?, second.to_bool_arg()?),
+                    BinaryOperator::LTE      => blocks::lte(first.to_bool_arg()?, second.to_bool_arg()?),
+                    BinaryOperator::GT       => blocks::gt(first.to_bool_arg()?, second.to_bool_arg()?),
+                    BinaryOperator::GTE      => blocks::gte(first.to_bool_arg()?, second.to_bool_arg()?),
+                    BinaryOperator::EQ       => blocks::eq(first.to_bool_arg()?, second.to_bool_arg()?),
+                    BinaryOperator::Plus     => blocks::plus(first.to_num_arg()?, second.to_num_arg()?),
+                    BinaryOperator::Minus    => blocks::minus(first.to_num_arg()?, second.to_num_arg()?),
+                    BinaryOperator::Multiply => blocks::multiply(first.to_num_arg()?, second.to_num_arg()?),
+                    BinaryOperator::Divide   => blocks::divide(first.to_num_arg()?, second.to_num_arg()?),
+                    BinaryOperator::Power    => blocks::power(first.to_num_arg()?, second.to_num_arg()?)
                 };
 
                 Value::Block(block)
@@ -204,22 +198,36 @@ fn compile_expression(expr: Expression) -> Result<Vec<Block>, LogicCompileError>
 
             Expression::UnaryOp { value, operator } => {
                 let value = compile_expr(*value)?;
+
                 Value::Block(match operator {
                     UnaryOperator::Not => blocks::not(value.to_bool_arg()?),
-                    UnaryOperator::Minus => todo!(),
-                    UnaryOperator::Plus => todo!()
+                    UnaryOperator::Minus => blocks::minus_unary(value.to_num_arg()?),
+                    UnaryOperator::Plus => blocks::minus_unary(value.to_num_arg()?),
                 })
             }
 
             Expression::PrimaryExpression(prim) => {
-                todo!()
+                match prim {
+                    PrimaryExpression::Index { from, index } => {
+                        todo!("create a type system")
+                    }
+                    PrimaryExpression::VariableAccess { from, name } => {
+                        todo!("create a type system")
+                    }
+                    PrimaryExpression::Call { from, arguments } => {
+                        todo!("create a type system")
+                    }
+                }
             }
 
             Expression::Literal(literal) => Value::Literal(literal),
         })
     }
 
-    Ok(result)
+    Ok(match compile_expr(expr)? {
+        Value::Block(block) => block,
+        Value::Literal(literal) => Err(LogicCompileError::DanglingLiteral { literal })?
+    })
 }
 
 fn variable_type_to_swrs(var_type: VariableType) -> SWRSVariableType {
@@ -246,5 +254,10 @@ pub enum LogicCompileError {
         // todo: change to a simpler type lol
         expected: ArgumentBlockReturnType,
         got: ArgumentBlockReturnType,
+    },
+
+    #[error("dangling literal as a statement")]
+    DanglingLiteral {
+        literal: Literal
     }
 }

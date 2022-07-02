@@ -21,3 +21,8 @@ Random notes and future plans about the logic language.
  6. also maps cant have types, perhaps this is an oppurtunity to implement some kind of type safety in rafflesia while
     they get compiled down to the same code
  7. moreblocks wen
+ 8. yeah power (`**`) doesnt work because sketchware doesnt have a block that does that, and i dont think its possible
+    to create a sugar for it, since we need to know how many times a number needed to be powered to, not to mention
+    that the "power to" can be a block and can be unpredictable.
+    
+    its possible to use some asd trickery but like, bro this is an expression :skull:

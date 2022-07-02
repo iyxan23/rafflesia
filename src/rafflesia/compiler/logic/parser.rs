@@ -83,6 +83,8 @@ pub type LogicParseResult<T> = Result<T, LogicParseError>;
 type Lexer<'a> = LexerWrapper<'a, Token>;
 
 // todo: a "block" rule for `{ ... }`
+// todo: ..having newlines as a token is a bad idea. how do we know if a statement ends or is it
+//       being continued on the next line?
 
 // A note before you read all this: I have no idea about parser stuff; so if you do know about it,
 // please tell me what is your approach to doing this, I feel like there's a waaay better way
