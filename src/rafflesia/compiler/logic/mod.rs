@@ -1,4 +1,5 @@
-use swrs::api::block::{Block, Blocks};
+use std::fmt::Debug;
+use swrs::api::block::{ArgumentBlockReturnType, ArgValue, Block, Blocks};
 use swrs::api::component::ComponentKind;
 use swrs::api::screen::{EventType, MoreBlock};
 use swrs::api::screen::Event;
@@ -8,15 +9,22 @@ use swrs::parser::logic::variable::{Variable, VariableType as SWRSVariableType};
 use swrs::LinkedHashMap;
 use thiserror::Error;
 
-use crate::compiler::logic::ast::{ComplexVariableType, InnerStatement, InnerStatements, OuterStatement, OuterStatements, VariableType};
+use crate::compiler::logic::ast::{
+    BinaryOperator, ComplexVariableType, Expression, InnerStatement, InnerStatements, Literal,
+    OuterStatement, OuterStatements, UnaryOperator, VariableType
+};
 
 pub mod parser;
 pub mod ast;
+mod blocks;
 
 #[cfg(test)]
 mod tests;
 
-/// Compiles a logic AST into
+// todo: add positions in AST
+// todo: a custom result handling system similar to error-stack
+
+/// Compiles a logic AST into blocks
 pub fn compile_screen(statements: OuterStatements, attached_layout: &View)
     -> Result<LogicCompileResult, LogicCompileError> {
 
@@ -91,7 +99,127 @@ pub fn compile_screen(statements: OuterStatements, attached_layout: &View)
 }
 
 fn compile_inner_statements(stmts: InnerStatements) -> Result<Blocks, LogicCompileError> {
-    todo!()
+    let mut result = Vec::new();
+
+    for statement in stmts.0 {
+        match statement {
+            InnerStatement::VariableAssignment(_) => {}
+            InnerStatement::IfStatement(_) => {}
+            InnerStatement::RepeatStatement(_) => {}
+            InnerStatement::ForeverStatement(_) => {}
+            InnerStatement::Break => result.push(blocks::r#break()),
+            InnerStatement::Continue => result.push(blocks::r#continue()),
+            InnerStatement::Expression(expr) => result.append(&mut compile_expression(expr)?),
+        }
+    }
+
+    Ok(Blocks(result))
+}
+
+fn compile_expression(expr: Expression) -> Result<Vec<Block>, LogicCompileError> {
+    let mut result = Vec::new();
+
+    enum Value {
+        Block(Block),
+        Literal(Literal),
+    }
+
+    impl Value {
+        fn to_num_arg(self) -> Result<ArgValue<f64>, LogicCompileError> {
+            Ok(match self {
+                Value::Block(block) => ArgValue::Block(block),
+                Value::Literal(literal) => match literal {
+                    Literal::Number(num) => ArgValue::Value(num),
+                    Literal::Boolean(_) => Err(LogicCompileError::TypeError {
+                        expected: ArgumentBlockReturnType::Number,
+                        got: ArgumentBlockReturnType::Boolean
+                    })?,
+                    Literal::String(_) => Err(LogicCompileError::TypeError {
+                        expected: ArgumentBlockReturnType::Number,
+                        got: ArgumentBlockReturnType::String
+                    })?
+                }
+            })
+        }
+
+        fn to_bool_arg(self) -> Result<ArgValue<bool>, LogicCompileError> {
+            Ok(match self {
+                Value::Block(block) => ArgValue::Block(block),
+                Value::Literal(literal) => match literal {
+                    Literal::Number(_) => Err(LogicCompileError::TypeError {
+                        expected: ArgumentBlockReturnType::Boolean,
+                        got: ArgumentBlockReturnType::Number
+                    })?,
+                    Literal::Boolean(bool) => ArgValue::Value(bool),
+                    Literal::String(_) => Err(LogicCompileError::TypeError {
+                        expected: ArgumentBlockReturnType::Boolean,
+                        got: ArgumentBlockReturnType::String
+                    })?
+                }
+            })
+        }
+
+        fn to_str_arg(self) -> Result<ArgValue<String>, LogicCompileError> {
+            Ok(match self {
+                Value::Block(block) => ArgValue::Block(block),
+                Value::Literal(literal) => match literal {
+                    Literal::Number(_) => Err(LogicCompileError::TypeError {
+                        expected: ArgumentBlockReturnType::String,
+                        got: ArgumentBlockReturnType::Number
+                    })?,
+                    Literal::Boolean(_) => Err(LogicCompileError::TypeError {
+                        expected: ArgumentBlockReturnType::String,
+                        got: ArgumentBlockReturnType::Boolean
+                    })?,
+                    Literal::String(str) => ArgValue::Value(str),
+                }
+            })
+        }
+    }
+
+    fn compile_expr(expr: Expression) -> Result<Value, LogicCompileError> {
+        Ok(match expr {
+            Expression::BinOp { first, operator, second } => {
+                let first = compile_expr(*first)?;
+                let second = compile_expr(*second)?;
+
+                let block = match operator {
+                    BinaryOperator::Or =>
+                        blocks::or(first.to_bool_arg()?, second.to_bool_arg()?),
+                    BinaryOperator::And => todo!(),
+                    BinaryOperator::LT => todo!(),
+                    BinaryOperator::LTE => todo!(),
+                    BinaryOperator::GT => todo!(),
+                    BinaryOperator::GTE => todo!(),
+                    BinaryOperator::EQ => todo!(),
+                    BinaryOperator::Plus => todo!(),
+                    BinaryOperator::Minus => todo!(),
+                    BinaryOperator::Multiply => todo!(),
+                    BinaryOperator::Divide => todo!(),
+                    BinaryOperator::Power => todo!()
+                };
+
+                Value::Block(block)
+            }
+
+            Expression::UnaryOp { value, operator } => {
+                let value = compile_expr(*value)?;
+                Value::Block(match operator {
+                    UnaryOperator::Not => blocks::not(value.to_bool_arg()?),
+                    UnaryOperator::Minus => todo!(),
+                    UnaryOperator::Plus => todo!()
+                })
+            }
+
+            Expression::PrimaryExpression(prim) => {
+                todo!()
+            }
+
+            Expression::Literal(literal) => Value::Literal(literal),
+        })
+    }
+
+    Ok(result)
 }
 
 fn variable_type_to_swrs(var_type: VariableType) -> SWRSVariableType {
@@ -113,5 +241,10 @@ pub struct LogicCompileResult {
 
 #[derive(Debug, Error)]
 pub enum LogicCompileError {
-
+    #[error("wrong type given")]
+    TypeError {
+        // todo: change to a simpler type lol
+        expected: ArgumentBlockReturnType,
+        got: ArgumentBlockReturnType,
+    }
 }
