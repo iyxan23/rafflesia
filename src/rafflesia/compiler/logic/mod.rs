@@ -9,7 +9,7 @@ use swrs::parser::logic::variable::{Variable, VariableType as SWRSVariableType};
 use swrs::LinkedHashMap;
 use thiserror::Error;
 
-use crate::compiler::logic::ast::{BinaryOperator, ComplexVariableType, Expression, InnerStatement, InnerStatements, Literal, OuterStatement, OuterStatements, PrimaryExpression, UnaryOperator, VariableType};
+use crate::compiler::logic::ast::{BinaryOperator, ComplexVariableType, Expression, InnerStatement, InnerStatements, Literal, OuterStatement, OuterStatements, PrimaryExpression, UnaryOperator, VariableAssignment, VariableType};
 
 pub mod parser;
 pub mod ast;
@@ -100,133 +100,158 @@ fn compile_inner_statements(stmts: InnerStatements) -> Result<Blocks, LogicCompi
 
     for statement in stmts.0 {
         match statement {
-            InnerStatement::VariableAssignment(_) => {}
-            InnerStatement::IfStatement(_) => {}
-            InnerStatement::RepeatStatement(_) => {}
-            InnerStatement::ForeverStatement(_) => {}
+            InnerStatement::VariableAssignment(var_assign) => {
+                todo!("create a type system")
+            }
+            InnerStatement::IfStatement(if_stmt) => {
+                let condition = compile_expression(if_stmt.condition)?.to_bool_arg()?;
+                let body = compile_inner_statements(if_stmt.body)?;
+                let else_body = if_stmt.else_body
+                    .map(|else_body| compile_inner_statements(else_body))
+                    .transpose()?;
+
+                result.push(match else_body {
+                    None => blocks::r#if(condition, body),
+                    Some(else_body) => blocks::if_else(condition, body, else_body)
+                });
+            }
+            InnerStatement::RepeatStatement(repeat_stmt) => {
+                let value = compile_expression(repeat_stmt.condition)?.to_num_arg()?;
+                let body = compile_inner_statements(repeat_stmt.body)?;
+
+                result.push(blocks::repeat(value, body));
+            }
+            InnerStatement::ForeverStatement(forever_stmt) => {
+                let body = compile_inner_statements(forever_stmt.body)?;
+
+                result.push(blocks::forever(body));
+            }
             InnerStatement::Break => result.push(blocks::r#break()),
             InnerStatement::Continue => result.push(blocks::r#continue()),
-            InnerStatement::Expression(expr) => result.push(compile_expression(expr)?),
+            InnerStatement::Expression(expr) =>
+                result.push(compile_expression(expr)?.expect_block()?),
         }
     }
 
     Ok(Blocks(result))
 }
 
-fn compile_expression(expr: Expression) -> Result<Block, LogicCompileError> {
-    enum Value {
-        Block(Block),
-        Literal(Literal),
-    }
+// the return value of [`compile_expression`], can either be a block or a literal
+enum ExprValue {
+    Block(Block),
+    Literal(Literal),
+}
 
-    impl Value {
-        fn to_num_arg(self) -> Result<ArgValue<f64>, LogicCompileError> {
-            Ok(match self {
-                Value::Block(block) => ArgValue::Block(block),
-                Value::Literal(literal) => match literal {
-                    Literal::Number(num) => ArgValue::Value(num),
-                    Literal::Boolean(_) => Err(LogicCompileError::TypeError {
-                        expected: ArgumentBlockReturnType::Number,
-                        got: ArgumentBlockReturnType::Boolean
-                    })?,
-                    Literal::String(_) => Err(LogicCompileError::TypeError {
-                        expected: ArgumentBlockReturnType::Number,
-                        got: ArgumentBlockReturnType::String
-                    })?
-                }
-            })
-        }
-
-        fn to_bool_arg(self) -> Result<ArgValue<bool>, LogicCompileError> {
-            Ok(match self {
-                Value::Block(block) => ArgValue::Block(block),
-                Value::Literal(literal) => match literal {
-                    Literal::Number(_) => Err(LogicCompileError::TypeError {
-                        expected: ArgumentBlockReturnType::Boolean,
-                        got: ArgumentBlockReturnType::Number
-                    })?,
-                    Literal::Boolean(bool) => ArgValue::Value(bool),
-                    Literal::String(_) => Err(LogicCompileError::TypeError {
-                        expected: ArgumentBlockReturnType::Boolean,
-                        got: ArgumentBlockReturnType::String
-                    })?
-                }
-            })
-        }
-
-        fn to_str_arg(self) -> Result<ArgValue<String>, LogicCompileError> {
-            Ok(match self {
-                Value::Block(block) => ArgValue::Block(block),
-                Value::Literal(literal) => match literal {
-                    Literal::Number(_) => Err(LogicCompileError::TypeError {
-                        expected: ArgumentBlockReturnType::String,
-                        got: ArgumentBlockReturnType::Number
-                    })?,
-                    Literal::Boolean(_) => Err(LogicCompileError::TypeError {
-                        expected: ArgumentBlockReturnType::String,
-                        got: ArgumentBlockReturnType::Boolean
-                    })?,
-                    Literal::String(str) => ArgValue::Value(str),
-                }
-            })
-        }
-    }
-
-    fn compile_expr(expr: Expression) -> Result<Value, LogicCompileError> {
-        Ok(match expr {
-            Expression::BinOp { first, operator, second } => {
-                let first = compile_expr(*first)?;
-                let second = compile_expr(*second)?;
-
-                let block = match operator {
-                    BinaryOperator::Or       => blocks::or(first.to_bool_arg()?, second.to_bool_arg()?),
-                    BinaryOperator::And      => blocks::and(first.to_bool_arg()?, second.to_bool_arg()?),
-                    BinaryOperator::LT       => blocks::lt(first.to_bool_arg()?, second.to_bool_arg()?),
-                    BinaryOperator::LTE      => blocks::lte(first.to_bool_arg()?, second.to_bool_arg()?),
-                    BinaryOperator::GT       => blocks::gt(first.to_bool_arg()?, second.to_bool_arg()?),
-                    BinaryOperator::GTE      => blocks::gte(first.to_bool_arg()?, second.to_bool_arg()?),
-                    BinaryOperator::EQ       => blocks::eq(first.to_bool_arg()?, second.to_bool_arg()?),
-                    BinaryOperator::Plus     => blocks::plus(first.to_num_arg()?, second.to_num_arg()?),
-                    BinaryOperator::Minus    => blocks::minus(first.to_num_arg()?, second.to_num_arg()?),
-                    BinaryOperator::Multiply => blocks::multiply(first.to_num_arg()?, second.to_num_arg()?),
-                    BinaryOperator::Divide   => blocks::divide(first.to_num_arg()?, second.to_num_arg()?),
-                    BinaryOperator::Power    => blocks::power(first.to_num_arg()?, second.to_num_arg()?)
-                };
-
-                Value::Block(block)
+impl ExprValue {
+    fn to_num_arg(self) -> Result<ArgValue<f64>, LogicCompileError> {
+        Ok(match self {
+            ExprValue::Block(block) => ArgValue::Block(block),
+            ExprValue::Literal(literal) => match literal {
+                Literal::Number(num) => ArgValue::Value(num),
+                Literal::Boolean(_) => Err(LogicCompileError::TypeError {
+                    expected: ArgumentBlockReturnType::Number,
+                    got: ArgumentBlockReturnType::Boolean
+                })?,
+                Literal::String(_) => Err(LogicCompileError::TypeError {
+                    expected: ArgumentBlockReturnType::Number,
+                    got: ArgumentBlockReturnType::String
+                })?
             }
-
-            Expression::UnaryOp { value, operator } => {
-                let value = compile_expr(*value)?;
-
-                Value::Block(match operator {
-                    UnaryOperator::Not => blocks::not(value.to_bool_arg()?),
-                    UnaryOperator::Minus => blocks::minus_unary(value.to_num_arg()?),
-                    UnaryOperator::Plus => blocks::minus_unary(value.to_num_arg()?),
-                })
-            }
-
-            Expression::PrimaryExpression(prim) => {
-                match prim {
-                    PrimaryExpression::Index { from, index } => {
-                        todo!("create a type system")
-                    }
-                    PrimaryExpression::VariableAccess { from, name } => {
-                        todo!("create a type system")
-                    }
-                    PrimaryExpression::Call { from, arguments } => {
-                        todo!("create a type system")
-                    }
-                }
-            }
-
-            Expression::Literal(literal) => Value::Literal(literal),
         })
     }
 
-    Ok(match compile_expr(expr)? {
-        Value::Block(block) => block,
-        Value::Literal(literal) => Err(LogicCompileError::DanglingLiteral { literal })?
+    fn to_bool_arg(self) -> Result<ArgValue<bool>, LogicCompileError> {
+        Ok(match self {
+            ExprValue::Block(block) => ArgValue::Block(block),
+            ExprValue::Literal(literal) => match literal {
+                Literal::Number(_) => Err(LogicCompileError::TypeError {
+                    expected: ArgumentBlockReturnType::Boolean,
+                    got: ArgumentBlockReturnType::Number
+                })?,
+                Literal::Boolean(bool) => ArgValue::Value(bool),
+                Literal::String(_) => Err(LogicCompileError::TypeError {
+                    expected: ArgumentBlockReturnType::Boolean,
+                    got: ArgumentBlockReturnType::String
+                })?
+            }
+        })
+    }
+
+    fn to_str_arg(self) -> Result<ArgValue<String>, LogicCompileError> {
+        Ok(match self {
+            ExprValue::Block(block) => ArgValue::Block(block),
+            ExprValue::Literal(literal) => match literal {
+                Literal::Number(_) => Err(LogicCompileError::TypeError {
+                    expected: ArgumentBlockReturnType::String,
+                    got: ArgumentBlockReturnType::Number
+                })?,
+                Literal::Boolean(_) => Err(LogicCompileError::TypeError {
+                    expected: ArgumentBlockReturnType::String,
+                    got: ArgumentBlockReturnType::Boolean
+                })?,
+                Literal::String(str) => ArgValue::Value(str),
+            }
+        })
+    }
+
+    // expects a block, otherwise return an `Err(LogicCompileError::DanglingLiteral)`
+    fn expect_block(self) -> Result<Block, LogicCompileError> {
+        match self {
+            ExprValue::Block(block) => Ok(block),
+            ExprValue::Literal(literal) => Err(LogicCompileError::DanglingLiteral { literal })
+        }
+    }
+}
+
+fn compile_expression(expr: Expression) -> Result<ExprValue, LogicCompileError> {
+    Ok(match expr {
+        Expression::BinOp { first, operator, second } => {
+            let first = compile_expression(*first)?;
+            let second = compile_expression(*second)?;
+
+            let block = match operator {
+                BinaryOperator::Or       => blocks::or(first.to_bool_arg()?, second.to_bool_arg()?),
+                BinaryOperator::And      => blocks::and(first.to_bool_arg()?, second.to_bool_arg()?),
+                BinaryOperator::LT       => blocks::lt(first.to_bool_arg()?, second.to_bool_arg()?),
+                BinaryOperator::LTE      => blocks::lte(first.to_bool_arg()?, second.to_bool_arg()?),
+                BinaryOperator::GT       => blocks::gt(first.to_bool_arg()?, second.to_bool_arg()?),
+                BinaryOperator::GTE      => blocks::gte(first.to_bool_arg()?, second.to_bool_arg()?),
+                BinaryOperator::EQ       => blocks::eq(first.to_bool_arg()?, second.to_bool_arg()?),
+                BinaryOperator::Plus     => blocks::plus(first.to_num_arg()?, second.to_num_arg()?),
+                BinaryOperator::Minus    => blocks::minus(first.to_num_arg()?, second.to_num_arg()?),
+                BinaryOperator::Multiply => blocks::multiply(first.to_num_arg()?, second.to_num_arg()?),
+                BinaryOperator::Divide   => blocks::divide(first.to_num_arg()?, second.to_num_arg()?),
+                BinaryOperator::Power    => blocks::power(first.to_num_arg()?, second.to_num_arg()?)
+            };
+
+            ExprValue::Block(block)
+        }
+
+        Expression::UnaryOp { value, operator } => {
+            let value = compile_expression(*value)?;
+
+            ExprValue::Block(match operator {
+                UnaryOperator::Not => blocks::not(value.to_bool_arg()?),
+                UnaryOperator::Minus => blocks::minus_unary(value.to_num_arg()?),
+                UnaryOperator::Plus => blocks::minus_unary(value.to_num_arg()?),
+            })
+        }
+
+        Expression::PrimaryExpression(prim) => {
+            match prim {
+                PrimaryExpression::Index { from, index } => {
+                    todo!("create a type system")
+                }
+                PrimaryExpression::VariableAccess { from, name } => {
+                    todo!("create a type system")
+                }
+                PrimaryExpression::Call { from, arguments } => {
+                    todo!("create a type system")
+                }
+            }
+        }
+
+        Expression::Literal(literal) => ExprValue::Literal(literal),
     })
 }
 

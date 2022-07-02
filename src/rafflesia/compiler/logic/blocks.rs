@@ -12,7 +12,7 @@
 
 use swrs::api::block::{
     Argument, ArgumentBlockReturnType, ArgValue, Block, BlockCategory, BlockContent, BlockControl,
-    BlockType
+    Blocks, BlockType
 };
 
 // decoration to make things consistent
@@ -225,4 +225,59 @@ pub fn minus_unary(value: ArgValue<Number>) -> Block {
 pub fn plus_unary(value: ArgValue<Number>) -> Block {
     // fancy sugar to "value * 1"
     multiply(value, ArgValue::Value(1f64))
+}
+
+pub fn repeat(value: ArgValue<Number>, nest: Blocks) -> Block {
+    Block {
+        sub_stack1: Some(nest),
+        sub_stack2: None,
+        color: Default::default(),
+        op_code: "repeat".to_string(),
+        content: BlockContent::builder()
+            .text("repeat")
+            .arg(Argument::Number { name: None, value })
+            .build(),
+        block_type: BlockType::Control(BlockControl::OneNest)
+    }
+}
+
+pub fn forever(nest: Blocks) -> Block {
+    Block {
+        sub_stack1: Some(nest),
+        sub_stack2: None,
+        color: Default::default(),
+        op_code: "forever".to_string(),
+        content: BlockContent::builder().text("forever").build(),
+        block_type: BlockType::Control(BlockControl::OneNest)
+    }
+}
+
+pub fn r#if(condition: ArgValue<Boolean>, body: Blocks) -> Block {
+    Block {
+        sub_stack1: Some(body),
+        sub_stack2: None,
+        color: Default::default(),
+        op_code: "forever".to_string(),
+        content: BlockContent::builder()
+            .text("if")
+            .arg(Argument::Boolean { name: None, value: condition })
+            .text("then")
+            .build(),
+        block_type: BlockType::Control(BlockControl::OneNest)
+    }
+}
+
+pub fn r#if_else(condition: ArgValue<Boolean>, if_body: Blocks, else_body: Blocks) -> Block {
+    Block {
+        sub_stack1: Some(if_body),
+        sub_stack2: Some(else_body),
+        color: Default::default(),
+        op_code: "ifElse".to_string(),
+        content: BlockContent::builder()
+            .text("if")
+            .arg(Argument::Boolean { name: None, value: condition })
+            .text("then")
+            .build(),
+        block_type: BlockType::Control(BlockControl::TwoNest)
+    }
 }
