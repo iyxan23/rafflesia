@@ -88,22 +88,22 @@ pub fn and(first: ArgValue<Boolean>, second: ArgValue<Boolean>) -> Block {
     }
 }
 
-pub fn lt(first: ArgValue<Boolean>, second: ArgValue<Boolean>) -> Block {
+pub fn lt(first: ArgValue<Number>, second: ArgValue<Number>) -> Block {
     Block {
         sub_stack1: None,
         sub_stack2: None,
         color: BlockCategory::Math.into(),
         op_code: "<".to_string(),
         content: BlockContent::builder()
-            .arg(Argument::Boolean { name: None, value: first })
+            .arg(Argument::Number { name: None, value: first })
             .text("<")
-            .arg(Argument::Boolean { name: None, value: second })
+            .arg(Argument::Number { name: None, value: second })
             .build(),
         block_type: BlockType::Argument(ArgumentBlockReturnType::Boolean)
     }
 }
 
-pub fn lte(first: ArgValue<Boolean>, second: ArgValue<Boolean>) -> Block {
+pub fn lte(first: ArgValue<Number>, second: ArgValue<Number>) -> Block {
     // fancy sugar to "first < second || first == second"
     or(ArgValue::Block(
         lt(first.clone(), second.clone())
@@ -112,22 +112,22 @@ pub fn lte(first: ArgValue<Boolean>, second: ArgValue<Boolean>) -> Block {
     ))
 }
 
-pub fn gt(first: ArgValue<Boolean>, second: ArgValue<Boolean>) -> Block {
+pub fn gt(first: ArgValue<Number>, second: ArgValue<Number>) -> Block {
     Block {
         sub_stack1: None,
         sub_stack2: None,
         color: BlockCategory::Math.into(),
         op_code: ">".to_string(),
         content: BlockContent::builder()
-            .arg(Argument::Boolean { name: None, value: first })
+            .arg(Argument::Number { name: None, value: first })
             .text(">")
-            .arg(Argument::Boolean { name: None, value: second })
+            .arg(Argument::Number { name: None, value: second })
             .build(),
         block_type: BlockType::Argument(ArgumentBlockReturnType::Boolean)
     }
 }
 
-pub fn gte(first: ArgValue<Boolean>, second: ArgValue<Boolean>) -> Block {
+pub fn gte(first: ArgValue<Number>, second: ArgValue<Number>) -> Block {
     // fancy sugar to "first > second || first == second"
     or(ArgValue::Block(
         gt(first.clone(), second.clone())
@@ -136,16 +136,16 @@ pub fn gte(first: ArgValue<Boolean>, second: ArgValue<Boolean>) -> Block {
     ))
 }
 
-pub fn eq(first: ArgValue<Boolean>, second: ArgValue<Boolean>) -> Block {
+pub fn eq(first: ArgValue<Number>, second: ArgValue<Number>) -> Block {
     Block {
         sub_stack1: None,
         sub_stack2: None,
         color: BlockCategory::Math.into(),
         op_code: "=".to_string(),
         content: BlockContent::builder()
-            .arg(Argument::Boolean { name: None, value: first })
+            .arg(Argument::Number { name: None, value: first })
             .text("==")
-            .arg(Argument::Boolean { name: None, value: second })
+            .arg(Argument::Number { name: None, value: second })
             .build(),
         block_type: BlockType::Argument(ArgumentBlockReturnType::Boolean)
     }

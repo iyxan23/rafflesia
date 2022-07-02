@@ -212,11 +212,11 @@ fn compile_expression(expr: Expression) -> Result<ExprValue, LogicCompileError> 
             let block = match operator {
                 BinaryOperator::Or       => blocks::or(first.to_bool_arg()?, second.to_bool_arg()?),
                 BinaryOperator::And      => blocks::and(first.to_bool_arg()?, second.to_bool_arg()?),
-                BinaryOperator::LT       => blocks::lt(first.to_bool_arg()?, second.to_bool_arg()?),
-                BinaryOperator::LTE      => blocks::lte(first.to_bool_arg()?, second.to_bool_arg()?),
-                BinaryOperator::GT       => blocks::gt(first.to_bool_arg()?, second.to_bool_arg()?),
-                BinaryOperator::GTE      => blocks::gte(first.to_bool_arg()?, second.to_bool_arg()?),
-                BinaryOperator::EQ       => blocks::eq(first.to_bool_arg()?, second.to_bool_arg()?),
+                BinaryOperator::LT       => blocks::lt(first.to_num_arg()?, second.to_num_arg()?),
+                BinaryOperator::LTE      => blocks::lte(first.to_num_arg()?, second.to_num_arg()?),
+                BinaryOperator::GT       => blocks::gt(first.to_num_arg()?, second.to_num_arg()?),
+                BinaryOperator::GTE      => blocks::gte(first.to_num_arg()?, second.to_num_arg()?),
+                BinaryOperator::EQ       => blocks::eq(first.to_num_arg()?, second.to_num_arg()?),
                 BinaryOperator::Plus     => blocks::plus(first.to_num_arg()?, second.to_num_arg()?),
                 BinaryOperator::Minus    => blocks::minus(first.to_num_arg()?, second.to_num_arg()?),
                 BinaryOperator::Multiply => blocks::multiply(first.to_num_arg()?, second.to_num_arg()?),
@@ -274,7 +274,7 @@ pub struct LogicCompileResult {
 
 #[derive(Debug, Error)]
 pub enum LogicCompileError {
-    #[error("wrong type given")]
+    #[error("wrong type given, expected {expected:?} got {got:?}")]
     TypeError {
         // todo: change to a simpler type lol
         expected: ArgumentBlockReturnType,
