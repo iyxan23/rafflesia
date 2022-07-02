@@ -13,7 +13,7 @@ pub fn build() -> Result<()> {
     let project = Project::find_project()?;
     let project_name = project.manifest.project.name.to_owned();
 
-    println!("Building project {}\n", style(&project_name).bold().cyan());
+    println!("Building project {}", style(&project_name).bold().cyan());
 
     let pb = ProgressBar::new_spinner()
         .with_style(ProgressStyle::default_spinner()
@@ -50,6 +50,9 @@ fn compile(pb: &ProgressBar, project: Project) -> Result<()> {
 
         let parsed_layout = compiler::layout::parser::parse_layout(layout.as_str())
             .context(format!("Syntax error on {}", activity.layout))?;
+
+        let view = compiler::layout::compile_view_tree(parsed_layout)
+            .context(format!("Error while compiling layout {}", activity.layout))?;
 
         // for later use
         // let parsed_layout = match compiler::layout::parser::parse_layout(layout.as_str()) {
@@ -118,10 +121,10 @@ fn compile(pb: &ProgressBar, project: Project) -> Result<()> {
         let parsed_logic = compiler::logic::parser::parse_logic(logic.as_str())
             .context(format!("Syntax error on {}", activity.logic))?;
 
-        // todo: logic compiler
+        let logic_compile_result = compiler::logic::compile_logic(parsed_logic, &view)
+            .context(format!("Error while compiling logic {}", activity.logic))?;
 
         // after we built our blocks, we'll be building the views
-        let view = compiler::layout::compile_view_tree(parsed_layout)?;
         let flattened = swrs::api::view::flatten_views(vec![view], None, None);
 
         // todo: packing
@@ -130,7 +133,7 @@ fn compile(pb: &ProgressBar, project: Project) -> Result<()> {
             pb.println(view.reconstruct().unwrap());
         }
 
-        pb.println(format!("logic: {:?}", parsed_logic));
+        pb.println(format!("{:?}", logic_compile_result));
     }
 
     Ok(())

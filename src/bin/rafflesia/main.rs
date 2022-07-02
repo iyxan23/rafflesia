@@ -26,7 +26,7 @@ fn try_main() -> Result<()> {
 
 fn main() -> ExitCode {
     if let Err(err) = try_main() {
-        eprintln!("{} {}", style("error:").bold().red(), err);
+        eprintln!("\n{} {}", style("error:").bold().red(), err);
         eprintln!();
         eprintln!("Caused by:");
         err.chain().skip(1)
