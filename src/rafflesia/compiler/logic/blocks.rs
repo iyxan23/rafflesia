@@ -257,7 +257,7 @@ pub fn r#if(condition: ArgValue<Boolean>, body: Blocks) -> Block {
         sub_stack1: Some(body),
         sub_stack2: None,
         color: Default::default(),
-        op_code: "forever".to_string(),
+        op_code: "if".to_string(),
         content: BlockContent::builder()
             .text("if")
             .arg(Argument::Boolean { name: None, value: condition })
