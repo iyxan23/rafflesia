@@ -4,6 +4,8 @@ use anyhow::{bail, Context, Result};
 use ariadne::{Label, Report, ReportBuilder, ReportKind, sources};
 use console::style;
 use indicatif::{ProgressBar, ProgressStyle};
+use swrs::api::block::BlockContent;
+use swrs::parser::logic::BlockContainer;
 use swrs::parser::Parsable;
 use crate::compiler;
 use crate::core::project::Project;
@@ -133,7 +135,18 @@ fn compile(pb: &ProgressBar, project: Project) -> Result<()> {
             pb.println(view.reconstruct().unwrap());
         }
 
-        pb.println(format!("{:?}", logic_compile_result));
+        // todo: LogicCompileResult has a lot of stuff associated with screen, this is just for
+        //      demonstration and to check if the compilation is working
+
+        for event in logic_compile_result.events {
+            pb.println("\n");
+            pb.println(format!(" ==> Event {}: {:?}", event.name, event.event_type));
+            pb.println(" vv Reconstructed blocks vv");
+            let block_container: BlockContainer = event.code.into();
+            for block in block_container.0 {
+                pb.println(block.reconstruct().unwrap());
+            }
+        }
     }
 
     Ok(())
