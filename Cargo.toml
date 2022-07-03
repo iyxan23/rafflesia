@@ -41,3 +41,5 @@ log = "^0.4.17"
 console = "^0.15.0"
 ariadne = "^0.1.5"
 indicatif = "0.16.2"
+
+lazy_static = "^1.4.0"

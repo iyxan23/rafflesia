@@ -72,42 +72,56 @@ pub fn compile_logic(statements: OuterStatements, attached_layout: &View)
 
             OuterStatement::ActivityEventListener { event_name, body } => {
                 events.push(
-                    Event {
+                    (Event {
                         name: event_name,
                         event_type: EventType::ActivityEvent,
-                        code: compile_inner_statements(body)?
-                    }
+                        code: Blocks::new() // will be compiled later
+                    }, body)
                 );
             }
 
             OuterStatement::ViewEventListener { view_id, event_name, body } => {
                 events.push(
-                    Event {
+                    (Event {
                         name: event_name,
                         event_type: EventType::ViewEvent { id: view_id },
-                        code: compile_inner_statements(body)?
-                    }
+                        code: Blocks::new() // will be compiled later
+                    }, body)
                 );
             }
         }
     }
 
+    // compile the events' blocks now that we have access to all of the variables
+    let events = events.into_iter().map(|(event, body)| {
+        Ok(Event {
+            name: event.name,
+            event_type: event.event_type,
+            code: compile_inner_statements(body, &variables, &list_variables)?
+        })
+    }).collect::<Result<_, _>>()?;
+
     Ok(LogicCompileResult { variables, list_variables, more_blocks, components, events })
 }
 
-fn compile_inner_statements(stmts: InnerStatements) -> Result<Blocks, LogicCompileError> {
+fn compile_inner_statements(
+    stmts: InnerStatements,
+    variables: &LinkedHashMap<String, Variable>,
+    list_variables: &LinkedHashMap<String, ListVariable>,
+) -> Result<Blocks, LogicCompileError> {
+
     let mut result = Vec::new();
 
     for statement in stmts.0 {
         match statement {
             InnerStatement::VariableAssignment(var_assign) => {
-                todo!("create a type system")
+
             }
             InnerStatement::IfStatement(if_stmt) => {
                 let condition = compile_expression(if_stmt.condition)?.to_bool_arg()?;
-                let body = compile_inner_statements(if_stmt.body)?;
+                let body = compile_inner_statements(if_stmt.body, &variables, &list_variables)?;
                 let else_body = if_stmt.else_body
-                    .map(|else_body| compile_inner_statements(else_body))
+                    .map(|else_body| compile_inner_statements(else_body, &variables, &list_variables))
                     .transpose()?;
 
                 result.push(match else_body {
@@ -117,12 +131,12 @@ fn compile_inner_statements(stmts: InnerStatements) -> Result<Blocks, LogicCompi
             }
             InnerStatement::RepeatStatement(repeat_stmt) => {
                 let value = compile_expression(repeat_stmt.condition)?.to_num_arg()?;
-                let body = compile_inner_statements(repeat_stmt.body)?;
+                let body = compile_inner_statements(repeat_stmt.body, &variables, &list_variables)?;
 
                 result.push(blocks::repeat(value, body));
             }
             InnerStatement::ForeverStatement(forever_stmt) => {
-                let body = compile_inner_statements(forever_stmt.body)?;
+                let body = compile_inner_statements(forever_stmt.body, &variables, &list_variables)?;
 
                 result.push(blocks::forever(body));
             }

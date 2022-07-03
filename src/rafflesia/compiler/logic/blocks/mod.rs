@@ -15,6 +15,8 @@ use swrs::api::block::{
     Blocks, BlockType
 };
 
+pub mod types;
+
 // decoration to make things consistent
 type Number = f64;
 type Boolean = bool;
