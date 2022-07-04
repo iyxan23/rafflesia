@@ -334,3 +334,12 @@ pub fn set_var_string(name: String, value: ArgValue<String>) -> Block {
         BlockType::Regular
     )
 }
+
+pub fn get_var(name: String, arg_type: ArgumentBlockReturnType) -> Block {
+    Block::new(
+        BlockCategory::Variable,
+        "getVar".to_string(),
+        BlockContent::builder().text(name).build(),
+        BlockType::Argument(arg_type)
+    )
+}

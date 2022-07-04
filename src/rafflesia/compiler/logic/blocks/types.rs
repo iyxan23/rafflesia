@@ -2,8 +2,8 @@ use lazy_static::lazy_static;
 use thiserror::Error;
 use swrs::api::block::{Argument, ArgumentBlockReturnType, ArgValue, Block, BlockCategory, BlockContent, BlockType};
 use std::collections::HashMap;
-use std::fmt::{Display, Formatter};
 
+// A type
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 pub enum Type {
     Void,
@@ -35,6 +35,20 @@ pub enum ComponentType {
     // todo: components
 }
 
+impl Type {
+    pub fn from_arg_block(block_type: BlockType) -> Option<Self> {
+        Some(Type::Primitive(match block_type {
+            BlockType::Argument(ArgumentBlockReturnType::Number) => PrimitiveType::Number,
+            BlockType::Argument(ArgumentBlockReturnType::String) => PrimitiveType::String,
+            BlockType::Argument(ArgumentBlockReturnType::Boolean) => PrimitiveType::Boolean,
+            // todo: Component, and View
+            //       requires indexing of enum variants, we only have the typename string here
+            _ => return None,
+        }))
+    }
+}
+
+/// Value of [`Type`]
 #[derive(Debug, Clone)]
 pub enum TypeValue {
     Number(ArgValue<super::Number>),
