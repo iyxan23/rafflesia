@@ -115,7 +115,41 @@ fn compile_inner_statements(
     for statement in stmts.0 {
         match statement {
             InnerStatement::VariableAssignment(var_assign) => {
+                let variable = variables.get(&var_assign.identifier)
+                    .ok_or_else(|| {
+                        // show an UnAssignableVariable error if there is a list variable with
+                        // the name
+                        if let Some(list_var) = list_variables.get(&var_assign.identifier) {
+                            LogicCompileError::UnAssignableVariable {
+                                identifier: var_assign.identifier.clone(),
+                                variable_type: Type::Complex(ComplexType::List {
+                                    inner_type: match list_var.r#type {
+                                        SWRSVariableType::Boolean => PrimitiveType::Boolean,
+                                        SWRSVariableType::Integer => PrimitiveType::Number,
+                                        SWRSVariableType::String => PrimitiveType::String,
+                                        SWRSVariableType::HashMap => unreachable!()
+                                    }
+                                })
+                            }
+                        } else {
+                            LogicCompileError::VariableDoesntExist {
+                                identifier: var_assign.identifier.clone()
+                            }
+                        }
+                    })?;
 
+                let value = compile_expression(var_assign.value)?;
+
+                result.push(match variable.r#type {
+                    SWRSVariableType::Boolean =>
+                        blocks::set_var_boolean(var_assign.identifier, value.to_bool_arg()?),
+                    SWRSVariableType::Integer =>
+                        blocks::set_var_int(var_assign.identifier, value.to_num_arg()?),
+                    SWRSVariableType::String =>
+                        blocks::set_var_string(var_assign.identifier, value.to_str_arg()?),
+
+                    SWRSVariableType::HashMap => unreachable!(),
+                });
             }
             InnerStatement::IfStatement(if_stmt) => {
                 let condition = compile_expression(if_stmt.condition)?.to_bool_arg()?;
@@ -293,6 +327,16 @@ pub enum LogicCompileError {
         // todo: change to a simpler type lol
         expected: ArgumentBlockReturnType,
         got: ArgumentBlockReturnType,
+
+    #[error("variable {identifier} doesn't exist")]
+    VariableDoesntExist {
+        identifier: String,
+    },
+
+    #[error("variable {identifier} with type {variable_type:?} can't be assigned to a value")]
+    UnAssignableVariable {
+        identifier: String,
+        variable_type: Type
     },
 
     #[error("dangling literal as a statement")]

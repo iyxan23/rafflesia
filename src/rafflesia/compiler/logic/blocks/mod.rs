@@ -283,3 +283,54 @@ pub fn r#if_else(condition: ArgValue<Boolean>, if_body: Blocks, else_body: Block
         block_type: BlockType::Control(BlockControl::TwoNest)
     }
 }
+
+pub fn set_var_int(name: String, value: ArgValue<Number>) -> Block {
+    Block::new(
+        BlockCategory::Variable,
+        "setVarInt".to_string(),
+        BlockContent::builder()
+            .text("set")
+            .arg(Argument::Menu {
+                name: "varInt".to_string(),
+                value: ArgValue::Value(name)
+            })
+            .text("to")
+            .arg(Argument::Number { name: None, value })
+            .build(),
+        BlockType::Regular
+    )
+}
+
+pub fn set_var_boolean(name: String, value: ArgValue<Boolean>) -> Block {
+    Block::new(
+        BlockCategory::Variable,
+        "setVarBoolean".to_string(),
+        BlockContent::builder()
+            .text("set")
+            .arg(Argument::Menu {
+                name: "varBool".to_string(),
+                value: ArgValue::Value(name)
+            })
+            .text("to")
+            .arg(Argument::Boolean { name: None, value })
+            .build(),
+        BlockType::Regular
+    )
+}
+
+pub fn set_var_string(name: String, value: ArgValue<String>) -> Block {
+    Block::new(
+        BlockCategory::Variable,
+        "setVarString".to_string(),
+        BlockContent::builder()
+            .text("set")
+            .arg(Argument::Menu {
+                name: "varStr".to_string(),
+                value: ArgValue::Value(name)
+            })
+            .text("to")
+            .arg(Argument::String { name: None, value })
+            .build(),
+        BlockType::Regular
+    )
+}
