@@ -2,6 +2,8 @@ use lazy_static::lazy_static;
 use thiserror::Error;
 use swrs::api::block::{Argument, ArgumentBlockReturnType, ArgValue, Block, BlockCategory, BlockContent, BlockType};
 use std::collections::HashMap;
+use swrs::api::view::{View, ViewType as SWRSViewType};
+use swrs::LinkedHashMap;
 
 // A type
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
@@ -20,7 +22,7 @@ pub enum PrimitiveType {
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 pub enum ComplexType {
-    List { inner_type: PrimitiveType },
+    List { inner_type: PrimitiveType }, // todo: restrict to only Number and String
     Map // todo: map
 }
 
@@ -28,6 +30,31 @@ pub enum ComplexType {
 pub enum ViewType {
     LinearLayout, ScrollView, Button, TextView, EditText, ImageView, WebView, ProgressBar, ListView,
     Spinner, CheckBox, Switch, SeekBar, CalendarView, Fab, AdView, MapView
+}
+
+impl ViewType {
+    // yeah
+    pub fn from_swrs_view(typ: &SWRSViewType) -> ViewType {
+        match typ {
+            SWRSViewType::LinearLayout { .. } => ViewType::LinearLayout,
+            SWRSViewType::ScrollView { .. } => ViewType::ScrollView,
+            SWRSViewType::Button { .. } => ViewType::Button,
+            SWRSViewType::TextView { .. } => ViewType::TextView,
+            SWRSViewType::EditText { .. } => ViewType::EditText,
+            SWRSViewType::ImageView { .. } => ViewType::ImageView,
+            SWRSViewType::WebView => ViewType::WebView,
+            SWRSViewType::ProgressBar { .. } => ViewType::ProgressBar,
+            SWRSViewType::ListView { .. } => ViewType::ListView,
+            SWRSViewType::Spinner { .. } => ViewType::Spinner,
+            SWRSViewType::CheckBox { .. } => ViewType::CheckBox,
+            SWRSViewType::Switch { .. } => ViewType::Switch,
+            SWRSViewType::SeekBar { .. } => ViewType::SeekBar,
+            SWRSViewType::CalendarView { .. } => ViewType::CalendarView,
+            SWRSViewType::Fab { .. } => ViewType::Fab,
+            SWRSViewType::AdView { .. } => ViewType::AdView,
+            SWRSViewType::MapView => ViewType::MapView
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
@@ -114,20 +141,96 @@ impl TypeValue {
     });
 }
 
+/// A simple struct that stores any variable types for the logic code to use. This provides APIs
+/// to resolve variables/functions (and their fields/methods) and construct blocks out of them
 #[derive(Debug, Clone)]
-pub struct Function {
-    // if function is attached to an object; e.g. var.method()
-    // the var value will then be the first argument on the generate function given
-    pub method: bool,
+pub struct Definitions<'a> {
+    variables: LinkedHashMap<String, Type>,
+    layout_ref: &'a View,
+}
 
+impl<'a> Definitions<'a> {
+    pub fn new(layout_ref: &'a View) -> Self {
+        Self {
+            variables: Default::default(),
+            layout_ref
+        }
+    }
+
+    // returns None when the variable name is already used
+    pub fn add_variable(&mut self, name: String, typ: Type) -> Option<String> {
+        if self.variables.contains_key(&name) { return None; }
+        if self.layout_ref.find_id(&name).is_some() { return None; }
+
+        self.variables.insert(name.clone(), typ);
+
+        Some(name)
+    }
+
+    pub fn get_var(&self, name: &str) -> Option<Type> {
+        if let Some(var) = self.variables.get(name) { return Some(*var); }
+        if let Some(View { view: Ok(view), .. }) = self.layout_ref.find_id(name) {
+            return Some(Type::View(ViewType::from_swrs_view(view)))
+        }
+
+        None
+    }
+
+    pub fn get_members<S: ToString>(&self, typ: Type) -> Option<TypeData> {
+        match typ {
+            Type::Void => None,
+            Type::Primitive(PrimitiveType::String) => None, // todo
+            Type::Primitive(PrimitiveType::Number) => None, // todo
+            Type::Primitive(PrimitiveType::Boolean) => None, // todo
+            Type::Complex(ComplexType::Map) => None, // todo
+            Type::Complex(ComplexType::List { inner_type: PrimitiveType::String }) => None, // todo
+            Type::Complex(ComplexType::List { inner_type: PrimitiveType::Number }) => None, // todo
+            Type::View(_) => None, // todo
+            Type::Component(_) => None, // todo
+            _ => unreachable!("list cant have bool inner type")
+        }
+    }
+
+    pub fn get_global_func(name: &str) -> Option<&GlobalFunction> {
+        GLOBAL_FUNCTIONS.get(name)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum Member {
+    Field {
+        generate: fn(TypeValue) -> Block,
+        return_type: Type,
+    },
+    Method {
+        arg_types: Vec<Type>,
+        generate: fn(Vec<TypeValue>) -> Block,
+        return_type: Type,
+    },
+}
+
+// stores stuff about a type
+#[derive(Debug, Clone)]
+pub struct TypeData {
+    // when this type is indexed: var[val]
+    // the parameter [TypeValue; 2]: [0] is the var getting indexed, [1] is the value that's used to
+    // index
+    pub index: Option<fn([TypeValue; 2]) -> Block>,
+
+    // all the members of this type data
+    pub members: HashMap<String, Member>,
+}
+
+// a global function
+#[derive(Debug, Clone)]
+pub struct GlobalFunction {
     pub name: String,
     pub return_type: Type,
     pub argument_types: Vec<Type>,
-    generate: fn(Vec<TypeValue>) -> Vec<Block>,
+    generate: fn(Vec<TypeValue>) -> Vec<Block>
 }
 
-impl Function {
-    /// generates blocks from this function with the specified arguments
+impl GlobalFunction {
     pub fn generate(&self, args: Vec<TypeValue>) -> Result<Vec<Block>, GenerateError> {
         let args_types = args.iter()
             .map(|arg| arg.as_type())
@@ -177,25 +280,7 @@ pub enum GenerateError {
     },
 }
 
-pub fn resolve_function(name: &str) -> Option<&Function> {
-    FUNCTIONS.get(name)
-}
-
-pub fn resolve_method(t: Type, name: &str) -> Option<&Function> {
-    TYPES.get(&t)?.get(name)
-}
-
 // to make creating hashmaps easier
-macro_rules! hashmap {
-    { $($key:expr => $value:expr),+ } => {
-        {
-            let mut m = HashMap::new();
-            $(m.insert($key, $value);)+
-            m
-        }
-     };
-}
-
 macro_rules! hashmap_str {
     { $($key:expr => $value:expr),+ } => {
         {
@@ -207,7 +292,7 @@ macro_rules! hashmap_str {
 }
 
 lazy_static! {
-    static ref FUNCTIONS: HashMap<String, Function> = {
+    static ref GLOBAL_FUNCTIONS: HashMap<String, GlobalFunction> = {
         hashmap_str! {
             "toast" => new_func("toast", Type::Void, vec![], |mut args| {
                 let text = args.remove(0).to_str();
@@ -224,28 +309,6 @@ lazy_static! {
             })
         }
     };
-
-    static ref TYPES: HashMap<Type, HashMap<String, Function>> = {
-        hashmap! {
-            Type::Primitive(PrimitiveType::Number) => hashmap_str! {
-                "toString" => new_method("toString", Type::Primitive(PrimitiveType::String), vec![], |mut args| {
-                    let num = args.remove(0).to_num();
-
-                    vec![Block::new(
-                        BlockCategory::Operator,
-                        "toString".to_string(),
-                        BlockContent::builder()
-                            .text("toString")
-                            .arg(Argument::Number { name: None, value: num })
-                            .text("without")
-                            .text("decimal")
-                            .build(),
-                        BlockType::Argument(ArgumentBlockReturnType::String)
-                    )]
-                })
-            }
-        }
-    };
 }
 
 // shortcut of creating a new func
@@ -254,25 +317,8 @@ fn new_func(
     return_type: Type,
     argument_types: Vec<Type>,
     generate_fn: fn(Vec<TypeValue>) -> Vec<Block>
-) -> Function {
-    Function {
-        method: false,
-        name: name.to_string(),
-        return_type,
-        argument_types,
-        generate: generate_fn
-    }
-}
-
-// shortcut of creating a new method
-fn new_method(
-    name: &str,
-    return_type: Type,
-    argument_types: Vec<Type>,
-    generate_fn: fn(Vec<TypeValue>) -> Vec<Block>
-) -> Function {
-    Function {
-        method: true,
+) -> GlobalFunction {
+    GlobalFunction {
         name: name.to_string(),
         return_type,
         argument_types,
