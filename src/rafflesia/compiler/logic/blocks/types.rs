@@ -252,7 +252,7 @@ impl<'a> Definitions<'a> {
         None
     }
 
-    pub fn get_members(typ: Type) -> Option<&'static TypeData> {
+    pub fn get_type_data(typ: Type) -> Option<&'static TypeData> {
         match typ {
             Type::Void => None,
             Type::Primitive(PrimitiveType::String) => None, // todo
@@ -394,10 +394,13 @@ impl Member {
 // stores stuff about a type
 #[derive(Debug, Clone)]
 pub struct TypeData {
-    // when this type is indexed: var[val]
-    // the parameter [TypeValue; 2]: [0] is the var getting indexed, [1] is the value that's used to
-    // index
-    pub index: Option<fn([TypeValue; 2]) -> Block>,
+    // hashmap of <type used to index> -> <generate function>
+    //
+    // a type can have multiple ways of indexing depending on the indexing value type
+    //
+    // the fn parameter [TypeValue; 2]: [0] is the var getting indexed, [1] is the value that's
+    // used to index
+    pub index: HashMap<Type, fn([TypeValue; 2]) -> Block>,
 
     // all the members of this type data
     pub members: HashMap<String, Member>,
@@ -409,11 +412,11 @@ pub struct GlobalFunction {
     pub name: String,
     pub return_type: Type,
     pub argument_types: Vec<Type>,
-    generate: fn(Vec<TypeValue>) -> Vec<Block>
+    generate: fn(Vec<TypeValue>) -> Block
 }
 
 impl GlobalFunction {
-    pub fn generate(&self, args: Vec<TypeValue>) -> Result<Vec<Block>, GenerateError> {
+    pub fn generate(&self, args: Vec<TypeValue>) -> Result<Block, GenerateError> {
         let args_types = args.iter()
             .map(|arg| arg.as_type())
             .collect::<Vec<Type>>();
@@ -479,7 +482,7 @@ lazy_static! {
             "toast" => new_func("toast", Type::Void, vec![], |mut args| {
                 let text = args.remove(0).to_str();
 
-                vec![Block::new(
+                Block::new(
                     BlockCategory::ComponentFunc,
                     "doToast".to_string(),
                     BlockContent::builder()
@@ -487,7 +490,7 @@ lazy_static! {
                         .arg(Argument::String { name: None, value: text })
                         .build(),
                     BlockType::Regular
-                )]
+                )
             })
         }
     };
@@ -498,7 +501,7 @@ fn new_func(
     name: &str,
     return_type: Type,
     argument_types: Vec<Type>,
-    generate_fn: fn(Vec<TypeValue>) -> Vec<Block>
+    generate_fn: fn(Vec<TypeValue>) -> Block
 ) -> GlobalFunction {
     GlobalFunction {
         name: name.to_string(),

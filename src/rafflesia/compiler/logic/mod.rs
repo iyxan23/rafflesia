@@ -182,6 +182,7 @@ fn compile_inner_statements(
 
 // the return value of [`compile_expression`], can either be a regular block, an argument block or
 // a literal
+#[derive(Debug, Clone)]
 enum ExprValue {
     // a regular freestanding block, has a type of BlockType::Regular
     Block(Block),
@@ -340,6 +341,25 @@ impl ExprValue {
             ExprValue::Literal(literal) => Err(LogicCompileError::DanglingLiteral { literal })
         }
     }
+
+    // gets the type of this expression value. returns None when its a block
+    fn get_type(&self) -> Option<Type> {
+        Some(match self {
+            ExprValue::Block(_) => return None,
+            ExprValue::ArgBlock(block) =>
+                if let BlockType::Argument(arg) = &block.block_type {
+                    Type::from_arg_block(arg)
+                        .expect(&*format!("Invalid arg block: {:?}", arg))
+                } else {
+                    panic!("ArgBlock cannot have a type other than Argument")
+                },
+            ExprValue::Literal(literal) => match literal {
+                Literal::Number(_) => Type::Primitive(PrimitiveType::Number),
+                Literal::Boolean(_) => Type::Primitive(PrimitiveType::Boolean),
+                Literal::String(_) => Type::Primitive(PrimitiveType::String),
+            }
+        })
+    }
 }
 
 fn compile_expression(
@@ -382,13 +402,65 @@ fn compile_expression(
         Expression::PrimaryExpression(prim) => {
             match prim {
                 PrimaryExpression::Index { from, index } => {
-                    todo!("create a type system")
+                    let from = compile_expression(*from, &definitions)?;
+                    let index_val = compile_expression(*index, &definitions)?;
+
+                    // get the types
+                    let typ = from.get_type()
+                        .ok_or_else(|| LogicCompileError::RegularBlockAsAnyArg {
+                            block: from.clone().expect_block().unwrap()
+                        })?;
+
+                    let index_val_type = from.get_type()
+                        .ok_or_else(|| LogicCompileError::RegularBlockAsAnyArg {
+                            block: index_val.clone().expect_block().unwrap()
+                        })?;
+
+                    // get the type data of this type that's getting indexed
+                    let type_data = Definitions::get_type_data(typ)
+                        .ok_or_else(|| LogicCompileError::CannotBeIndexed {
+                            typ, index_type: index_val_type
+                        })?;
+
+                    // see if the type can be indexed using the "indexing type" (or index_val)
+                    let index_gen = type_data.index
+                        .get(&index_val_type)
+                        .ok_or_else(|| LogicCompileError::CannotBeIndexed {
+                            typ, index_type: index_val_type
+                        })?;
+
+                    // generate using it i guess
+                    ExprValue::from_block(index_gen(
+                        [from.to_type_value()?, index_val.to_type_value()?]
+                    ))
                 }
 
                 PrimaryExpression::VariableAccess { from, name } => {
                     if let Some(from) = from {
-                        // let val = compile_expression(*from, &definitions)?;
-                        todo!("fields lol")
+                        let val = compile_expression(*from, &definitions)?;
+                        let typ = val.get_type()
+                            .ok_or_else(|| LogicCompileError::RegularBlockAsAnyArg {
+                                block: val.clone().expect_block().unwrap()
+                            })?;
+
+                        // retrieve the members of the type
+                        let type_data = Definitions::get_type_data(typ)
+                            .ok_or_else(|| LogicCompileError::MemberDoesntExist { name: name.clone(), typ })?;
+
+                        let member = type_data.members
+                            .get(&name)
+                            .ok_or_else(|| LogicCompileError::MemberDoesntExist { name: name.clone(), typ })?;
+
+                        let block = if matches!(member, Member::Field { .. }) {
+                            // generate it!
+                            member.field_gen(val.to_type_value()?)?
+                        } else {
+                            return Err(LogicCompileError::MethodMustBeCalled {
+                                method_name: name, typ
+                            });
+                        };
+
+                        ExprValue::from_block(block)
                     } else {
                         let var = definitions.get_var(&name)
                             .ok_or_else(|| LogicCompileError::VariableDoesntExist {
@@ -400,54 +472,36 @@ fn compile_expression(
                 }
 
                 PrimaryExpression::Call { from, name, arguments } => {
+                    // compile arguments expressions
+                    let args = arguments.0.into_iter()
+                        .map(|expr|
+                            compile_expression(expr, &definitions)
+                                .map(|val| val.to_type_value())
+
+                                // .flatten() but on steroids
+                                .and_then(std::convert::identity)
+                        )
+                        .collect::<Result<Vec<TypeValue>, _>>()?;
+
                     if let Some(from) = from {
                         // calling a method
                         // resolve this expression and get its type
                         let from = compile_expression(*from, &definitions)?;
-                        let typ = match &from {
-                            ExprValue::Block(_) =>
-                                return Err(LogicCompileError::RegularBlockAsAnyArg {
-                                    block: from.expect_block().unwrap()
-                                }),
-                            ExprValue::ArgBlock(block) =>
-                                if let BlockType::Argument(arg) = &block.block_type {
-                                    Type::from_arg_block(arg)
-                                        .expect(&*format!("Invalid arg block: {:?}", arg))
-                                } else {
-                                    panic!("ArgBlock cannot have a type other than Argument")
-                                },
-                            ExprValue::Literal(literal) => match literal {
-                                Literal::Number(_) => Type::Primitive(PrimitiveType::Number),
-                                Literal::Boolean(_) => Type::Primitive(PrimitiveType::Boolean),
-                                Literal::String(_) => Type::Primitive(PrimitiveType::String),
-                            }
-                        };
+                        let typ = from.get_type()
+                            .ok_or_else(|| LogicCompileError::RegularBlockAsAnyArg {
+                                block: from.clone().expect_block().unwrap()
+                            })?;
 
                         // retrieve the members of the type
-                        let type_data = Definitions::get_members(typ)
-                            .ok_or_else(|| LogicCompileError::MemberDoesntExist {
-                                name: name.clone(), typ
-                            })?;
+                        let type_data = Definitions::get_type_data(typ)
+                            .ok_or_else(|| LogicCompileError::MemberDoesntExist { name: name.clone(), typ })?;
 
                         let member = type_data.members
                             .get(&name)
-                            .ok_or_else(|| LogicCompileError::MemberDoesntExist {
-                                name: name.clone(), typ
-                            })?;
+                            .ok_or_else(|| LogicCompileError::MemberDoesntExist { name: name.clone(), typ })?;
 
                         let block = if matches!(member, Member::Method { .. }) {
                             // generate it!
-                            // oh yeah we forgor about arguments :skull:
-                            let args = arguments.0.into_iter()
-                                .map(|expr|
-                                    compile_expression(expr, &definitions)
-                                        .map(|val| val.to_type_value())
-
-                                        // .flatten() but on steroids
-                                        .and_then(std::convert::identity)
-                                )
-                                .collect::<Result<Vec<TypeValue>, _>>()?;
-
                             member.method_gen(from.to_type_value()?, args)?
                         } else {
                             return Err(LogicCompileError::FieldCannotBeCalled {
@@ -459,7 +513,12 @@ fn compile_expression(
                         ExprValue::from_block(block)
                     } else {
                         // global function
-                        todo!()
+                        let global_func = Definitions::get_global_func(&name)
+                            .ok_or_else(|| LogicCompileError::GlobalFunctionDoesntExist {
+                                name: name.clone()
+                            })?;
+
+                        ExprValue::from_block(global_func.generate(args)?)
                     }
                 }
             }
@@ -535,9 +594,22 @@ pub enum LogicCompileError {
         typ: Type
     },
 
+    #[error("type {typ:?} cannot be indexed with {index_type:?}")]
+    CannotBeIndexed {
+        typ: Type,
+        index_type: Type
+    },
+
     #[error("field {field_name} of variable type {typ:?} cannot be called as a function")]
     FieldCannotBeCalled {
         field_name: String,
+        typ: Type
+    },
+
+    #[error("method {method_name} of variable type {typ:?} must be called and cannot be accessed as\
+    a field")]
+    MethodMustBeCalled {
+        method_name: String,
         typ: Type
     },
 

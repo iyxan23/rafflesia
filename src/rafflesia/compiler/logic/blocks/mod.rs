@@ -370,7 +370,7 @@ macro_rules! method {
 // the fields and methods of the type Number
 lazy_static! {
     pub static ref NUMBER_TYPE_DATA: TypeData = TypeData {
-        index: None,
+        index: HashMap::new(),
         members: hashmap! {
             "toString" => method!((vec![]) -> Type::Primitive(PrimitiveType::String); |val, _| {
                 Block::new(
