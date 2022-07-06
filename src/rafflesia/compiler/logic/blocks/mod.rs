@@ -167,7 +167,7 @@ pub fn plus(first: ArgValue<Number>, second: ArgValue<Number>) -> Block {
             .text("+")
             .arg(Argument::Number { name: None, value: second })
             .build(),
-        block_type: BlockType::Argument(ArgumentBlockReturnType::Boolean)
+        block_type: BlockType::Argument(ArgumentBlockReturnType::Number)
     }
 }
 
@@ -182,7 +182,7 @@ pub fn minus(first: ArgValue<Number>, second: ArgValue<Number>) -> Block {
             .text("-")
             .arg(Argument::Number { name: None, value: second })
             .build(),
-        block_type: BlockType::Argument(ArgumentBlockReturnType::Boolean)
+        block_type: BlockType::Argument(ArgumentBlockReturnType::Number)
     }
 }
 
@@ -197,7 +197,7 @@ pub fn multiply(first: ArgValue<Number>, second: ArgValue<Number>) -> Block {
             .text("*")
             .arg(Argument::Number { name: None, value: second })
             .build(),
-        block_type: BlockType::Argument(ArgumentBlockReturnType::Boolean)
+        block_type: BlockType::Argument(ArgumentBlockReturnType::Number)
     }
 }
 
@@ -212,7 +212,7 @@ pub fn divide(first: ArgValue<Number>, second: ArgValue<Number>) -> Block {
             .text("/")
             .arg(Argument::Number { name: None, value: second })
             .build(),
-        block_type: BlockType::Argument(ArgumentBlockReturnType::Boolean)
+        block_type: BlockType::Argument(ArgumentBlockReturnType::Number)
     }
 }
 
