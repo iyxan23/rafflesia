@@ -1,10 +1,13 @@
 use lazy_static::lazy_static;
 use thiserror::Error;
-use swrs::api::block::{Argument, ArgumentBlockReturnType, ArgValue, Block, BlockCategory, BlockContent, BlockType};
+use swrs::api::block::{Argument, ArgumentBlockReturnType, ArgValue, Block, BlockCategory, BlockContent, BlockType, ListItem};
 use std::collections::HashMap;
+use std::str::FromStr;
 use swrs::api::view::{View, ViewType as SWRSViewType};
 use swrs::LinkedHashMap;
 use lazy_static::__Deref;
+use swrs::parser::logic::variable::{Variable as SWRSVariable, VariableType as SWRSVariableType};
+use swrs::parser::logic::list_variable::ListVariable as SWRSListVariable;
 
 // A type
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
@@ -31,6 +34,41 @@ pub enum ComplexType {
 pub enum ViewType {
     LinearLayout, ScrollView, Button, TextView, EditText, ImageView, WebView, ProgressBar, ListView,
     Spinner, CheckBox, Switch, SeekBar, CalendarView, Fab, AdView, MapView
+}
+
+impl FromStr for ViewType {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s {
+            "LinearLayout" => ViewType::LinearLayout, "ScrollView" => ViewType::ScrollView,
+            "Button" => ViewType::Button, "TextView" => ViewType::TextView,
+            "EditText" => ViewType::EditText, "ImageView" => ViewType::ImageView,
+            "WebView" => ViewType::WebView, "ProgressBar" => ViewType::ProgressBar,
+            "ListView" => ViewType::ListView, "Spinner" => ViewType::Spinner,
+            "CheckBox" => ViewType::CheckBox, "Switch" => ViewType::Switch,
+            "SeekBar" => ViewType::SeekBar, "CalendarView" => ViewType::CalendarView,
+            "Fab" => ViewType::Fab, // "Fab" might not be valid as a typename
+            "AdView" => ViewType::AdView, "MapView" => ViewType::MapView,
+            _ => return Err(())
+        })
+    }
+}
+
+impl ToString for ViewType {
+    fn to_string(&self) -> String {
+        match self {
+            ViewType::LinearLayout => "LinearLayout", ViewType::ScrollView => "ScrollView",
+            ViewType::Button => "Button", ViewType::TextView => "TextView",
+            ViewType::EditText => "EditText", ViewType::ImageView => "ImageView",
+            ViewType::WebView => "WebView", ViewType::ProgressBar => "ProgressBar",
+            ViewType::ListView => "ListView", ViewType::Spinner => "Spinner",
+            ViewType::CheckBox => "CheckBox", ViewType::Switch => "Switch",
+            ViewType::SeekBar => "SeekBar", ViewType::CalendarView => "CalendarView",
+            ViewType::Fab => "Fab", // "Fab" might not be valid as a typename
+            ViewType::AdView => "AdView", ViewType::MapView => "MapView",
+        }.to_string()
+    }
 }
 
 impl ViewType {
@@ -64,15 +102,51 @@ pub enum ComponentType {
 }
 
 impl Type {
-    pub fn from_arg_block(block_type: BlockType) -> Option<Self> {
-        Some(Type::Primitive(match block_type {
-            BlockType::Argument(ArgumentBlockReturnType::Number) => PrimitiveType::Number,
-            BlockType::Argument(ArgumentBlockReturnType::String) => PrimitiveType::String,
-            BlockType::Argument(ArgumentBlockReturnType::Boolean) => PrimitiveType::Boolean,
-            // todo: Component, and View
-            //       requires indexing of enum variants, we only have the typename string here
-            _ => return None,
-        }))
+    pub fn from_arg_block(arg_block_type: &ArgumentBlockReturnType) -> Option<Self> {
+        Some(match arg_block_type {
+            ArgumentBlockReturnType::Number => Type::Primitive(PrimitiveType::Number),
+            ArgumentBlockReturnType::String => Type::Primitive(PrimitiveType::String),
+            ArgumentBlockReturnType::Boolean => Type::Primitive(PrimitiveType::Boolean),
+            ArgumentBlockReturnType::List { inner_type } =>
+                Type::Complex(ComplexType::List {
+                    inner_type: match inner_type {
+                        ListItem::String => PrimitiveType::String,
+                        ListItem::Number => PrimitiveType::Number
+                    }
+                }),
+
+            ArgumentBlockReturnType::View { type_name } =>
+                Type::View(ViewType::from_str(type_name).ok()?),
+
+            ArgumentBlockReturnType::Component { type_name } =>
+                // Type::Component(ComponentType::from_str(&type_name).ok?)
+                todo!("components"),
+        })
+    }
+
+    pub fn to_arg_block_type(&self) -> ArgumentBlockReturnType {
+        match self {
+            Type::Void => unreachable!(),
+            Type::Primitive(PrimitiveType::Number) =>
+                ArgumentBlockReturnType::Number,
+            Type::Primitive(PrimitiveType::Boolean) =>
+                ArgumentBlockReturnType::Boolean,
+            Type::Primitive(PrimitiveType::String) =>
+                ArgumentBlockReturnType::String,
+            Type::Complex(ComplexType::List { inner_type }) =>
+                ArgumentBlockReturnType::List {
+                    inner_type: match inner_type {
+                        PrimitiveType::Number => ListItem::Number,
+                        PrimitiveType::String => ListItem::String,
+                        PrimitiveType::Boolean => unreachable!(),
+                    }
+                },
+            Type::Complex(ComplexType::Map) => todo!("map"),
+            Type::View(view) =>
+                // fixme: uhhh i think this might not work on some views
+                ArgumentBlockReturnType::View { type_name: view.to_string() },
+            Type::Component(_) => todo!("components")
+        }
     }
 }
 
@@ -146,6 +220,7 @@ impl TypeValue {
 /// to resolve variables/functions (and their fields/methods) and construct blocks out of them
 #[derive(Debug, Clone)]
 pub struct Definitions<'a> {
+    // type can only be Type::Primitive and Type::Complex
     variables: LinkedHashMap<String, Type>,
     layout_ref: &'a View,
 }
@@ -177,7 +252,7 @@ impl<'a> Definitions<'a> {
         None
     }
 
-    pub fn get_members<S: ToString>(&self, typ: Type) -> Option<&TypeData> {
+    pub fn get_members<S: ToString>(typ: Type) -> Option<&'static TypeData> {
         match typ {
             Type::Void => None,
             Type::Primitive(PrimitiveType::String) => None, // todo
@@ -194,6 +269,50 @@ impl<'a> Definitions<'a> {
 
     pub fn get_global_func(name: &str) -> Option<&GlobalFunction> {
         GLOBAL_FUNCTIONS.get(name)
+    }
+
+    pub fn deconstruct(self)
+        -> (LinkedHashMap<String, SWRSVariable>, LinkedHashMap<String, SWRSListVariable>) {
+        let mut variables = LinkedHashMap::new();
+        let mut list_variables = LinkedHashMap::new();
+
+        for (name, typ) in self.variables {
+            match typ {
+                Type::Primitive(prim) => {
+                    variables.insert(
+                        name.clone(),
+                        SWRSVariable {
+                            name,
+                            r#type: match prim {
+                                PrimitiveType::Number => SWRSVariableType::Integer,
+                                PrimitiveType::String => SWRSVariableType::String,
+                                PrimitiveType::Boolean => SWRSVariableType::Boolean,
+                            }
+                        }
+                    );
+                }
+
+                Type::Complex(ComplexType::List { inner_type }) => {
+                    list_variables.insert(
+                        name.clone(),
+                        SWRSListVariable {
+                            name,
+                            r#type: match inner_type {
+                                PrimitiveType::Number => SWRSVariableType::Integer,
+                                PrimitiveType::String => SWRSVariableType::String,
+                                PrimitiveType::Boolean =>
+                                    panic!("ComplexType::List cannot have a boolean inner type")
+                            }
+                        }
+                    );
+                }
+
+                Type::Complex(ComplexType::Map) => todo!(),
+                _ => ()
+            }
+        }
+
+        (variables, list_variables)
     }
 }
 

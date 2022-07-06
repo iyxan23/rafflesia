@@ -14,7 +14,7 @@ use crate::compiler::logic::ast::{
     OuterStatement, OuterStatements, PrimaryExpression, UnaryOperator, VariableAssignment,
     VariableType
 };
-use crate::compiler::logic::blocks::types::{ComplexType, PrimitiveType, Type};
+use crate::compiler::logic::blocks::types::{ComplexType, Definitions, PrimitiveType, Type};
 
 pub mod parser;
 pub mod ast;
@@ -30,8 +30,7 @@ mod tests;
 pub fn compile_logic(statements: OuterStatements, attached_layout: &View)
     -> Result<LogicCompileResult, LogicCompileError> {
 
-    let mut variables = LinkedHashMap::new();
-    let mut list_variables = LinkedHashMap::new();
+    let mut definitions = Definitions::new(attached_layout);
     let /* mut */ more_blocks = LinkedHashMap::new();
     let /* mut */ components = LinkedHashMap::new();
     let mut events = Vec::new();
@@ -39,40 +38,26 @@ pub fn compile_logic(statements: OuterStatements, attached_layout: &View)
     for outer_statement in statements.0 {
         match outer_statement {
             OuterStatement::SimpleVariableDeclaration { variable_type, identifier } => {
-                variables.insert(
-                    identifier.clone(),
-                    Variable {
-                        name: identifier,
-                        r#type: variable_type_to_swrs(variable_type)
+                definitions.add_variable(
+                    identifier,
+                    match variable_type {
+                        VariableType::Number => Type::Primitive(PrimitiveType::Number),
+                        VariableType::String => Type::Primitive(PrimitiveType::String),
+                        VariableType::Boolean => Type::Primitive(PrimitiveType::Boolean),
                     }
                 );
             }
 
             OuterStatement::ComplexVariableDeclaration { variable_type, identifier } => {
-                match variable_type {
-                    ComplexVariableType::Map { .. } => {
-                        // fixme: apparently you cant set types on map, perhaps we could add a some
-                        //        kind of type safety layer on rafflesia so maps are "typed"
-                        variables.insert(
-                            identifier.clone(),
-                            Variable {
-                                name: identifier,
-                                r#type: SWRSVariableType::HashMap
-                            }
-                        );
-                    }
+                // fixme: apparently you cant set types on map, perhaps we could add a some
+                //        kind of type safety layer on rafflesia so maps are "typed"
 
-                    ComplexVariableType::List { inner_type } => {
-                        // fixme: list maps :weary:
-                        list_variables.insert(
-                            identifier.clone(),
-                            ListVariable {
-                                name: identifier,
-                                r#type: variable_type_to_swrs(inner_type)
-                            }
-                        );
-                    }
-                }
+                // fixme: list maps :weary:
+
+                definitions.add_variable(
+                    identifier,
+                    complex_variable_type_to_type(variable_type)
+                );
             }
 
             OuterStatement::ActivityEventListener { event_name, body } => {
@@ -102,17 +87,19 @@ pub fn compile_logic(statements: OuterStatements, attached_layout: &View)
         Ok(Event {
             name: event.name,
             event_type: event.event_type,
-            code: compile_inner_statements(body, &variables, &list_variables)?
+            code: compile_inner_statements(body, &definitions)?
         })
     }).collect::<Result<_, _>>()?;
+
+    let (variables, list_variables)
+        = definitions.deconstruct();
 
     Ok(LogicCompileResult { variables, list_variables, more_blocks, components, events })
 }
 
 fn compile_inner_statements(
     stmts: InnerStatements,
-    variables: &LinkedHashMap<String, Variable>,
-    list_variables: &LinkedHashMap<String, ListVariable>,
+    definitions: &Definitions,
 ) -> Result<Blocks, LogicCompileError> {
 
     let mut result = Vec::new();
@@ -120,52 +107,41 @@ fn compile_inner_statements(
     for statement in stmts.0 {
         match statement {
             InnerStatement::VariableAssignment(var_assign) => {
-                let variable = variables.get(&var_assign.identifier)
-                    .ok_or_else(|| {
-                        // show an UnAssignableVariable error if there is a list variable with
-                        // the name
-                        if let Some(list_var) = list_variables.get(&var_assign.identifier) {
-                            LogicCompileError::UnAssignableVariable {
-                                identifier: var_assign.identifier.clone(),
-                                variable_type: Type::Complex(ComplexType::List {
-                                    inner_type: match list_var.r#type {
-                                        SWRSVariableType::Boolean => PrimitiveType::Boolean,
-                                        SWRSVariableType::Integer => PrimitiveType::Number,
-                                        SWRSVariableType::String => PrimitiveType::String,
-                                        SWRSVariableType::HashMap => unreachable!()
-                                    }
-                                })
-                            }
-                        } else {
-                            LogicCompileError::VariableDoesntExist {
-                                identifier: var_assign.identifier.clone()
-                            }
-                        }
+                let var = definitions.get_var(&var_assign.identifier)
+                    .ok_or_else(|| LogicCompileError::VariableDoesntExist {
+                        identifier: var_assign.identifier.clone()
                     })?;
 
-                let value = compile_expression(
-                    var_assign.value, &variables, &list_variables
-                )?;
+                // only primitive types can be assigned to a value
+                // todo: maybe allow complex types as well? that'd be a cool feature
+                let var_type = match var {
+                    Type::Primitive(primitive_type) => primitive_type,
+                    _ => return Err(LogicCompileError::UnAssignableVariable {
+                        identifier: var_assign.identifier.clone(),
+                        variable_type: Type::Void
+                    })
+                };
 
-                result.push(match variable.r#type {
-                    SWRSVariableType::Boolean =>
+                let value = compile_expression(var_assign.value, &definitions)?;
+
+                result.push(match var_type {
+                    PrimitiveType::Boolean =>
                         blocks::set_var_boolean(var_assign.identifier, value.to_bool_arg()?),
-                    SWRSVariableType::Integer =>
+                    PrimitiveType::Number =>
                         blocks::set_var_int(var_assign.identifier, value.to_num_arg()?),
-                    SWRSVariableType::String =>
+                    PrimitiveType::String =>
                         blocks::set_var_string(var_assign.identifier, value.to_str_arg()?),
-
-                    SWRSVariableType::HashMap => unreachable!(),
                 });
             }
+
             InnerStatement::IfStatement(if_stmt) => {
                 let condition = compile_expression(
-                    if_stmt.condition, &variables, &list_variables
+                    if_stmt.condition, &definitions
                 )?.to_bool_arg()?;
 
-                let body = compile_inner_statements(if_stmt.body, &variables, &list_variables)?;
+                let body = compile_inner_statements(if_stmt.body, &definitions)?;
                 let else_body = if_stmt.else_body
-                    .map(|else_body| compile_inner_statements(else_body, &variables, &list_variables))
+                    .map(|else_body| compile_inner_statements(else_body, &definitions))
                     .transpose()?;
 
                 result.push(match else_body {
@@ -173,25 +149,28 @@ fn compile_inner_statements(
                     Some(else_body) => blocks::if_else(condition, body, else_body)
                 });
             }
+
             InnerStatement::RepeatStatement(repeat_stmt) => {
                 let value = compile_expression(
-                    repeat_stmt.condition, &variables, &list_variables
+                    repeat_stmt.condition, &definitions
                 )?.to_num_arg()?;
 
-                let body = compile_inner_statements(repeat_stmt.body, &variables, &list_variables)?;
+                let body = compile_inner_statements(repeat_stmt.body, &definitions)?;
 
                 result.push(blocks::repeat(value, body));
             }
+
             InnerStatement::ForeverStatement(forever_stmt) => {
-                let body = compile_inner_statements(forever_stmt.body, &variables, &list_variables)?;
+                let body = compile_inner_statements(forever_stmt.body, &definitions)?;
 
                 result.push(blocks::forever(body));
             }
+
             InnerStatement::Break => result.push(blocks::r#break()),
             InnerStatement::Continue => result.push(blocks::r#continue()),
             InnerStatement::Expression(expr) =>
                 result.push(
-                    compile_expression(expr, &variables, &list_variables)?
+                    compile_expression(expr, &definitions)?
                         .expect_block()?
                 ),
         }
@@ -224,10 +203,14 @@ impl ExprValue {
                     other => Err(LogicCompileError::TypeError {
                         expected: Type::Primitive(PrimitiveType::Number),
 
-                        // expect: it's an error if ArgBlock is given a block type other than arg
-                        //         blocks
-                        got: Type::from_arg_block(other.clone())
-                            .expect(&*format!("ArgBlock() is given a block with type {:?}", other))
+                        // expect n panic: it's an error if ArgBlock is given a block type other
+                        //                 than arg blocks
+                        got: if let BlockType::Argument(arg) = other {
+                            Type::from_arg_block(&arg)
+                                .expect(&*format!("Invalid block argument: {:?}", arg))
+                        } else {
+                            panic!("ArgBlock() is given a block with type {:?}", other)
+                        }
                     })?
                 }
             },
@@ -256,10 +239,14 @@ impl ExprValue {
                     other => Err(LogicCompileError::TypeError {
                         expected: Type::Primitive(PrimitiveType::Boolean),
 
-                        // expect: it's an error if ArgBlock is given a block type other than arg
-                        //         blocks
-                        got: Type::from_arg_block(other.clone())
-                            .expect(&*format!("ArgBlock() is given a block with type {:?}", other))
+                        // expect n panic: it's an error if ArgBlock is given a block type other
+                        //                 than arg blocks
+                        got: if let BlockType::Argument(arg) = other {
+                            Type::from_arg_block(&arg)
+                                .expect(&*format!("Invalid block argument: {:?}", arg))
+                        } else {
+                            panic!("ArgBlock() is given a block with type {:?}", other)
+                        }
                     })?
                 }
             },
@@ -288,10 +275,14 @@ impl ExprValue {
                     other => Err(LogicCompileError::TypeError {
                         expected: Type::Primitive(PrimitiveType::String),
 
-                        // expect: it's an error if ArgBlock is given a block type other than arg
-                        //         blocks
-                        got: Type::from_arg_block(other.clone())
-                            .expect(&*format!("ArgBlock() is given a block with type {:?}", other))
+                        // expect n panic: it's an error if ArgBlock is given a block type other
+                        //                 than arg blocks
+                        got: if let BlockType::Argument(arg) = other {
+                            Type::from_arg_block(&arg)
+                                .expect(&*format!("Invalid block argument: {:?}", arg))
+                        } else {
+                            panic!("ArgBlock() is given a block with type {:?}", other)
+                        }
                     })?
                 }
             },
@@ -331,13 +322,12 @@ impl ExprValue {
 
 fn compile_expression(
     expr: Expression,
-    variables: &LinkedHashMap<String, Variable>,
-    list_variables: &LinkedHashMap<String, ListVariable>,
+    definitions: &Definitions
 ) -> Result<ExprValue, LogicCompileError> {
     Ok(match expr {
         Expression::BinOp { first, operator, second } => {
-            let first = compile_expression(*first, &variables, &list_variables)?;
-            let second = compile_expression(*second, &variables, &list_variables)?;
+            let first = compile_expression(*first, &definitions)?;
+            let second = compile_expression(*second, &definitions)?;
 
             let block = match operator {
                 BinaryOperator::Or       => blocks::or(first.to_bool_arg()?, second.to_bool_arg()?),
@@ -358,7 +348,7 @@ fn compile_expression(
         }
 
         Expression::UnaryOp { value, operator } => {
-            let value = compile_expression(*value, &variables, &list_variables)?;
+            let value = compile_expression(*value, &definitions)?;
 
             ExprValue::ArgBlock(match operator {
                 UnaryOperator::Not => blocks::not(value.to_bool_arg()?),
@@ -372,32 +362,21 @@ fn compile_expression(
                 PrimaryExpression::Index { from, index } => {
                     todo!("create a type system")
                 }
+
                 PrimaryExpression::VariableAccess { from, name } => {
                     if let Some(from) = from {
-                        let val = compile_expression(*from, &variables, &list_variables)?;
+                        // let val = compile_expression(*from, &definitions)?;
                         todo!("fields lol")
                     } else {
-                        if let Some(variable) = variables.get(&name) {
-                            ExprValue::ArgBlock(blocks::get_var(name, match variable.r#type {
-                                SWRSVariableType::Boolean => ArgumentBlockReturnType::Boolean,
-                                SWRSVariableType::Integer => ArgumentBlockReturnType::Number,
-                                SWRSVariableType::String => ArgumentBlockReturnType::String,
-                                SWRSVariableType::HashMap => todo!("maps h")
-                            }))
-                        } else if let Some(list_variable) = list_variables.get(&name) {
-                            ExprValue::ArgBlock(blocks::get_var(name, ArgumentBlockReturnType::List {
-                                inner_type: match list_variable.r#type {
-                                    SWRSVariableType::Integer => ListItem::Number,
-                                    SWRSVariableType::String => ListItem::String,
-                                    SWRSVariableType::Boolean => todo!("remove boolean from list ast"),
-                                    SWRSVariableType::HashMap => todo!("maps h")
-                                }
-                            }))
-                        } else {
-                            return Err(LogicCompileError::VariableDoesntExist { identifier: name })
-                        }
+                        let var = definitions.get_var(&name)
+                            .ok_or_else(|| LogicCompileError::VariableDoesntExist {
+                                identifier: name.clone()
+                            })?;
+
+                        ExprValue::ArgBlock(blocks::get_var(name, var.to_arg_block_type()))
                     }
                 }
+
                 PrimaryExpression::Call { from, arguments } => {
                     todo!("create a type system")
                 }
@@ -408,12 +387,22 @@ fn compile_expression(
     })
 }
 
-fn variable_type_to_swrs(var_type: VariableType) -> SWRSVariableType {
-    match var_type {
-        VariableType::Number => SWRSVariableType::Integer,
-        VariableType::String => SWRSVariableType::String,
-        VariableType::Boolean => SWRSVariableType::Boolean,
-    }
+fn variable_type_to_type(typ: VariableType) -> Type {
+    Type::Primitive(match typ {
+        VariableType::Number => PrimitiveType::Number,
+        VariableType::String => PrimitiveType::String,
+        VariableType::Boolean => PrimitiveType::Boolean,
+    })
+}
+
+fn complex_variable_type_to_type(typ: ComplexVariableType) -> Type {
+    Type::Complex(match typ {
+        ComplexVariableType::Map { .. } => ComplexType::Map,
+        ComplexVariableType::List { inner_type } => ComplexType::List {
+            inner_type: if let Type::Primitive(primitive_type) =
+                variable_type_to_type(inner_type) { primitive_type } else { unreachable!() }
+        }
+    })
 }
 
 #[derive(Debug)]
@@ -432,6 +421,14 @@ pub enum LogicCompileError {
         // todo: change to a simpler type lol
         expected: Type,
         got: Type,
+    },
+
+    #[error("tries to define variable {var_name} with type {var_type:?}, but another variable with \
+    the same name already exists with the type {existing_var_type:?}")]
+    VariableAlreadyExists {
+        var_name: String,
+        var_type: Type,
+        existing_var_type: Type
     },
 
     #[error("variable {identifier} doesn't exist")]
