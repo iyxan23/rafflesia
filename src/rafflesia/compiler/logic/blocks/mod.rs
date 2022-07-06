@@ -14,6 +14,9 @@ use swrs::api::block::{
     Argument, ArgumentBlockReturnType, ArgValue, Block, BlockCategory, BlockContent, BlockControl,
     Blocks, BlockType
 };
+use crate::compiler::logic::blocks::types::{Member, TypeData, Type, PrimitiveType};
+use std::collections::HashMap;
+use lazy_static::lazy_static;
 
 pub mod types;
 
@@ -342,4 +345,59 @@ pub fn get_var(name: String, arg_type: ArgumentBlockReturnType) -> Block {
         BlockContent::builder().text(name).build(),
         BlockType::Argument(arg_type)
     )
+}
+
+macro_rules! hashmap {
+    { $($key:expr => $value:expr),+ } => {
+        {
+            let mut m = HashMap::new();
+            $(m.insert($key.to_string(), $value);)+
+            m
+        }
+     };
+}
+
+macro_rules! method {
+    (($arg_types:expr) -> $ret_type:expr ; $gen_func:expr) => {
+        Member::Method {
+            arg_types: $arg_types,
+            return_type: $ret_type,
+            generate: $gen_func
+        }
+    };
+}
+
+// the fields and methods of the type Number
+lazy_static! {
+    pub static ref NUMBER_TYPE_DATA: TypeData = TypeData {
+        index: None,
+        members: hashmap! {
+            "toString" => method!((vec![]) -> Type::Primitive(PrimitiveType::String); |val, _| {
+                Block::new(
+                    BlockCategory::Operator,
+                    "toString".to_string(),
+                    BlockContent::builder()
+                        .text("toString")
+                        .arg(Argument::Number { name: None, value: val.to_num() })
+                        .text("without")
+                        .text("decimal")
+                        .build(),
+                    BlockType::Argument(ArgumentBlockReturnType::String)
+                )
+            }),
+            "toStringDec" => method!((vec![]) -> Type::Primitive(PrimitiveType::String); |val, _| {
+                Block::new(
+                    BlockCategory::Operator,
+                    "toStringWithDecimal".to_string(),
+                    BlockContent::builder()
+                        .text("toString")
+                        .arg(Argument::Number { name: None, value: val.to_num() })
+                        .text("with")
+                        .text("decimal")
+                        .build(),
+                    BlockType::Argument(ArgumentBlockReturnType::String)
+                )
+            })
+        }
+    };
 }

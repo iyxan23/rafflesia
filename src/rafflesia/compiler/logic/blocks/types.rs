@@ -4,6 +4,7 @@ use swrs::api::block::{Argument, ArgumentBlockReturnType, ArgValue, Block, Block
 use std::collections::HashMap;
 use swrs::api::view::{View, ViewType as SWRSViewType};
 use swrs::LinkedHashMap;
+use lazy_static::__Deref;
 
 // A type
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
@@ -104,7 +105,7 @@ impl TypeValue {
 
 macro_rules! type_value_func {
     ($name:ident $fn_name:ident -> $ret:ty { $typ_val:ident $decnstr:tt => $ret_v:expr }) => {
-        fn $fn_name(self) -> $ret {
+        pub(in super) fn $fn_name(self) -> $ret {
             match self {
                 TypeValue::$typ_val $decnstr => $ret_v,
                 other => panic!("expected {}, got {:?}", stringify!($name), other)
@@ -176,18 +177,18 @@ impl<'a> Definitions<'a> {
         None
     }
 
-    pub fn get_members<S: ToString>(&self, typ: Type) -> Option<TypeData> {
+    pub fn get_members<S: ToString>(&self, typ: Type) -> Option<&TypeData> {
         match typ {
             Type::Void => None,
             Type::Primitive(PrimitiveType::String) => None, // todo
-            Type::Primitive(PrimitiveType::Number) => None, // todo
+            Type::Primitive(PrimitiveType::Number) => Some(super::NUMBER_TYPE_DATA.deref()),
             Type::Primitive(PrimitiveType::Boolean) => None, // todo
             Type::Complex(ComplexType::Map) => None, // todo
             Type::Complex(ComplexType::List { inner_type: PrimitiveType::String }) => None, // todo
             Type::Complex(ComplexType::List { inner_type: PrimitiveType::Number }) => None, // todo
             Type::View(_) => None, // todo
             Type::Component(_) => None, // todo
-            _ => unreachable!("list cant have bool inner type")
+            _ => panic!("list cant have bool inner type")
         }
     }
 
@@ -204,9 +205,71 @@ pub enum Member {
     },
     Method {
         arg_types: Vec<Type>,
-        generate: fn(Vec<TypeValue>) -> Block,
+        //           value      args
+        generate: fn(TypeValue, Vec<TypeValue>) -> Block,
         return_type: Type,
     },
+}
+
+impl Member {
+    pub fn new_method(
+        arg_types: Vec<Type>, ret_type: Type, gen: fn(TypeValue, Vec<TypeValue>) -> Block
+    ) -> Member {
+        Member::Method {
+            arg_types,
+            generate: gen,
+            return_type: ret_type
+        }
+    }
+
+    pub fn new_field(ret_type: Type, gen: fn(TypeValue) -> Block) -> Member {
+        Member::Field {
+            generate: gen,
+            return_type: ret_type
+        }
+    }
+
+    pub fn method_gen(&self, val: TypeValue, args: Vec<TypeValue>) -> Result<Block, GenerateError> {
+        // make sure its a method
+        if let Member::Method {
+            arg_types: method_arg_types,
+            generate,
+            ..
+        } = self {
+            let args_types = args.iter()
+                .map(|arg| arg.as_type())
+                .collect::<Vec<Type>>();
+
+            if method_arg_types.len() != args_types.len() {
+                return Err(GenerateError::InvalidArgumentCount {
+                    expected: method_arg_types.clone(),
+                    got: args_types
+                })
+            }
+
+            // check if the parameter types have the same types as the argument types
+            for index in 0..method_arg_types.len() {
+                if method_arg_types.get(index).unwrap() != args_types.get(index).unwrap() {
+                    return Err(GenerateError::InvalidArgumentType {
+                        expected: method_arg_types.into_iter().cloned().collect(),
+                        got: args_types,
+                        index,
+                    })
+                }
+            }
+
+            Ok((generate)(val, args))
+        } else { panic!("not a method") }
+    }
+
+    pub fn field_gen(&self, value: TypeValue) -> Result<Block, GenerateError> {
+        // make sure its a method
+        if let Member::Field {
+            generate, ..
+        } = self {
+            Ok((generate)(value))
+        } else { panic!("not a field") }
+    }
 }
 
 // stores stuff about a type
