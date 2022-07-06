@@ -479,7 +479,9 @@ macro_rules! hashmap_str {
 lazy_static! {
     static ref GLOBAL_FUNCTIONS: HashMap<String, GlobalFunction> = {
         hashmap_str! {
-            "toast" => new_func("toast", Type::Void, vec![], |mut args| {
+            "toast" => new_func(
+                "toast", Type::Void,
+                vec![Type::Primitive(PrimitiveType::String)], |mut args| {
                 let text = args.remove(0).to_str();
 
                 Block::new(
