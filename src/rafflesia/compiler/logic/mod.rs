@@ -324,6 +324,14 @@ impl ExprValue {
         })
     }
 
+    // turns a block to either a Block, or ArgValue depending on its type
+    fn from_block(block: Block) -> Self {
+        match block.block_type {
+            BlockType::Argument(_) => ExprValue::ArgBlock(block),
+            _ => ExprValue::Block(block)
+        }
+    }
+
     // expects a block, otherwise return an `Err(LogicCompileError::DanglingLiteral)`
     fn expect_block(self) -> Result<Block, LogicCompileError> {
         match self {
@@ -440,17 +448,15 @@ fn compile_expression(
                                 )
                                 .collect::<Result<Vec<TypeValue>, _>>()?;
 
-
                             member.method_gen(from.to_type_value()?, args)?
                         } else {
                             return Err(LogicCompileError::FieldCannotBeCalled {
                                 field_name: name,
-                                var_name: "".to_string(),
                                 typ
                             });
                         };
 
-                        ExprValue::Block(block)
+                        ExprValue::from_block(block)
                     } else {
                         // global function
                         todo!()
@@ -529,10 +535,9 @@ pub enum LogicCompileError {
         typ: Type
     },
 
-    #[error("field {field_name} of variable {var_name} as type {typ:?} cannot be called as a function")]
+    #[error("field {field_name} of variable type {typ:?} cannot be called as a function")]
     FieldCannotBeCalled {
         field_name: String,
-        var_name: String,
         typ: Type
     },
 
