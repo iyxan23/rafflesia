@@ -252,7 +252,7 @@ impl<'a> Definitions<'a> {
         None
     }
 
-    pub fn get_members<S: ToString>(typ: Type) -> Option<&'static TypeData> {
+    pub fn get_members(typ: Type) -> Option<&'static TypeData> {
         match typ {
             Type::Void => None,
             Type::Primitive(PrimitiveType::String) => None, // todo
