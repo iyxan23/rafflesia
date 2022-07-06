@@ -136,10 +136,12 @@ pub enum PrimaryExpression {
         from: Option<Box<Expression>>, // using PrimaryExpression would be better
         name: String,
     },
-    // calling a VariableAccess with arguments
+    // this was previously `from(arguments)` but due to block limitations it wont work and we need
+    // this less flexible way
     Call {
-        // from(arguments)
-        from: Box<Expression>, // using PrimaryExpression would be better
+        // from.name(arguments)
+        from: Option<Box<Expression>>, // using PrimaryExpression might be better
+        name: String,
         arguments: Arguments
     }
 }

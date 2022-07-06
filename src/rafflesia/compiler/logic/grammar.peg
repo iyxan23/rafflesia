@@ -67,8 +67,8 @@ factor                  = "+" factor |
 power                   = primary ("**" power)?
 
 primary                 = primary "." identifier |
-                          primary "(" arguments? ")" |
-                          primary "[" expression "]" |
+                          primary name "[" expression "]" |
+                          (primary ".")? identifier "(" arguments? ")" |
                           atom
 
 arguments               = expression ("," expression)* ","? # trailing comma

@@ -11,10 +11,11 @@ use thiserror::Error;
 
 use crate::compiler::logic::ast::{
     BinaryOperator, ComplexVariableType, Expression, InnerStatement, InnerStatements, Literal,
-    OuterStatement, OuterStatements, PrimaryExpression, UnaryOperator, VariableAssignment,
-    VariableType
+    OuterStatement, OuterStatements, PrimaryExpression, UnaryOperator, VariableType
 };
-use crate::compiler::logic::blocks::types::{ComplexType, Definitions, PrimitiveType, Type};
+use crate::compiler::logic::blocks::types::{
+    ComplexType, Definitions, GenerateError, Member, PrimitiveType, Type, TypeValue
+};
 
 pub mod parser;
 pub mod ast;
@@ -89,7 +90,7 @@ pub fn compile_logic(statements: OuterStatements, attached_layout: &View)
             event_type: event.event_type,
             code: compile_inner_statements(body, &definitions)?
         })
-    }).collect::<Result<_, _>>()?;
+    }).collect::<Result<_, LogicCompileError>>()?;
 
     let (variables, list_variables)
         = definitions.deconstruct();
@@ -300,22 +301,35 @@ impl ExprValue {
         })
     }
 
+    fn to_type_value(self) -> Result<TypeValue, LogicCompileError> {
+        Ok(match self {
+            ExprValue::Block(block) => return Err(LogicCompileError::RegularBlockAsAnyArg { block }),
+            ExprValue::ArgBlock(block) => {
+                match block.block_type {
+                    BlockType::Argument(ArgumentBlockReturnType::Number) =>
+                        TypeValue::Number(ArgValue::Block(block)),
+                    BlockType::Argument(ArgumentBlockReturnType::Boolean) =>
+                        TypeValue::Boolean(ArgValue::Block(block)),
+                    BlockType::Argument(ArgumentBlockReturnType::String) =>
+                        TypeValue::String(ArgValue::Block(block)),
+                    other =>
+                        panic!("ArgBlock() cannot have a type other than Argument: {other:?}")
+                }
+            },
+            ExprValue::Literal(literal) => match literal {
+                Literal::Number(num) => TypeValue::Number(ArgValue::Value(num)),
+                Literal::Boolean(bool) => TypeValue::Boolean(ArgValue::Value(bool)),
+                Literal::String(str) => TypeValue::String(ArgValue::Value(str))
+            },
+        })
+    }
+
     // expects a block, otherwise return an `Err(LogicCompileError::DanglingLiteral)`
     fn expect_block(self) -> Result<Block, LogicCompileError> {
         match self {
             ExprValue::Block(block) => Ok(block),
             ExprValue::ArgBlock(block) => Err(LogicCompileError::DanglingArgBlock { block }),
             ExprValue::Literal(literal) => Err(LogicCompileError::DanglingLiteral { literal })
-        }
-    }
-
-    /// turns a [`Block`] to [`ExprValue`] (either to [`ExprValue::Block`] or [`ExprValue::ArgBlock`])
-    /// depending on the `block_type` of [`Block`]
-    fn from_block(block: Block) -> Self {
-        match &block.block_type {
-            BlockType::Regular => ExprValue::Block(block),
-            BlockType::Argument(_) => ExprValue::ArgBlock(block),
-            BlockType::Control(_) => ExprValue::Block(block),
         }
     }
 }
@@ -377,8 +391,70 @@ fn compile_expression(
                     }
                 }
 
-                PrimaryExpression::Call { from, arguments } => {
-                    todo!("create a type system")
+                PrimaryExpression::Call { from, name, arguments } => {
+                    if let Some(from) = from {
+                        // calling a method
+                        // resolve this expression and get its type
+                        let from = compile_expression(*from, &definitions)?;
+                        let typ = match &from {
+                            ExprValue::Block(_) =>
+                                return Err(LogicCompileError::RegularBlockAsAnyArg {
+                                    block: from.expect_block().unwrap()
+                                }),
+                            ExprValue::ArgBlock(block) =>
+                                if let BlockType::Argument(arg) = &block.block_type {
+                                    Type::from_arg_block(arg)
+                                        .expect(&*format!("Invalid arg block: {:?}", arg))
+                                } else {
+                                    panic!("ArgBlock cannot have a type other than Argument")
+                                },
+                            ExprValue::Literal(literal) => match literal {
+                                Literal::Number(_) => Type::Primitive(PrimitiveType::Number),
+                                Literal::Boolean(_) => Type::Primitive(PrimitiveType::Boolean),
+                                Literal::String(_) => Type::Primitive(PrimitiveType::String),
+                            }
+                        };
+
+                        // retrieve the members of the type
+                        let type_data = Definitions::get_members(typ)
+                            .ok_or_else(|| LogicCompileError::MemberDoesntExist {
+                                name: name.clone(), typ
+                            })?;
+
+                        let member = type_data.members
+                            .get(&name)
+                            .ok_or_else(|| LogicCompileError::MemberDoesntExist {
+                                name: name.clone(), typ
+                            })?;
+
+                        let block = if matches!(member, Member::Method { .. }) {
+                            // generate it!
+                            // oh yeah we forgor about arguments :skull:
+                            let args = arguments.0.into_iter()
+                                .map(|expr|
+                                    compile_expression(expr, &definitions)
+                                        .map(|val| val.to_type_value())
+
+                                        // .flatten() but on steroids
+                                        .and_then(std::convert::identity)
+                                )
+                                .collect::<Result<Vec<TypeValue>, _>>()?;
+
+
+                            member.method_gen(from.to_type_value()?, args)?
+                        } else {
+                            return Err(LogicCompileError::FieldCannotBeCalled {
+                                field_name: name,
+                                var_name: "".to_string(),
+                                typ
+                            });
+                        };
+
+                        ExprValue::Block(block)
+                    } else {
+                        // global function
+                        todo!()
+                    }
                 }
             }
         }
@@ -442,10 +518,33 @@ pub enum LogicCompileError {
         variable_type: Type
     },
 
-    #[error("regular block can't be used as a argument. expected an arg block with type {expected_arg_type:?}")]
+    #[error("the function {name} doesn't exist in the global scope")]
+    GlobalFunctionDoesntExist {
+        name: String
+    },
+
+    #[error("the member named {name} doesn't exist in the type {typ:?}")]
+    MemberDoesntExist {
+        name: String,
+        typ: Type
+    },
+
+    #[error("field {field_name} of variable {var_name} as type {typ:?} cannot be called as a function")]
+    FieldCannotBeCalled {
+        field_name: String,
+        var_name: String,
+        typ: Type
+    },
+
+    #[error("a void-returning expression can't be used as a argument. expected an arg block with type {expected_arg_type:?}")]
     RegularBlockAsArg {
         block: Block,
         expected_arg_type: Type
+    },
+
+    #[error("a void-returning expression can't be used as a argument.")]
+    RegularBlockAsAnyArg {
+        block: Block,
     },
 
     #[error("dangling argument block as a statement")]
@@ -456,5 +555,8 @@ pub enum LogicCompileError {
     #[error("dangling literal as a statement")]
     DanglingLiteral {
         literal: Literal
-    }
+    },
+
+    #[error("generate error: {0}")]
+    GenerateError(#[from] GenerateError)
 }

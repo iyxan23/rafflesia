@@ -624,14 +624,23 @@ fn primary(lex: &mut Lexer) -> LogicParseResult<Expression> {
                     index: Box::new(index_expr)
                 })
             }
-            TokenWrapperOwned { token: Token::LParen, .. } => {
+            TokenWrapperOwned { token: Token::LParen, .. }
+            // only if the accumulator is a variable access
+            if matches!(result, Expression::PrimaryExpression(PrimaryExpression::VariableAccess { .. }))
+            => {
                 let arguments = arguments(lex)?;
                 lex.expect(Token::RParen)?;
 
-                result = Expression::PrimaryExpression(PrimaryExpression::Call {
-                    from: Box::new(result),
-                    arguments
-                })
+                // only accept if the result is a variable access
+                // then we convert that variable access into a call
+
+                if let Expression::PrimaryExpression(
+                    PrimaryExpression::VariableAccess { from, name }
+                ) = result {
+                    result = Expression::PrimaryExpression(
+                        PrimaryExpression::Call { from, name, arguments }
+                    )
+                } else { unreachable!() }
             }
             _ => unreachable!()
         }
