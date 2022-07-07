@@ -10,7 +10,7 @@ pub fn cli() -> Command<'static> {
 }
 
 pub fn exec(args: &ArgMatches) -> Result<()> {
-    println!("generate");
+    println!("Generating rafflesia projects is currently work-in-progress");
 
     Ok(())
 }

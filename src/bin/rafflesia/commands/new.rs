@@ -70,13 +70,17 @@ pub fn exec(args: &ArgMatches) -> Result<()> {
                 chosen_libraries.contains(&"firebase")
                     .then(|| Ok(FirebaseLibraryTable {
                         enabled: true,
-                        api_key: input(" [firebase] Api key:", "")?
+                        project_id: input(" [firebase] Project id: ", "")?,
+                        app_id: input(" [firebase] App id: ", "")?,
+                        api_key: input(" [firebase] Api key:", "")?,
+                        storage_bucket: input(" [firebase] Storage bucket: ", "")?
                     }))
             )?,
 
             admob: chosen_libraries.contains(&"admob").then(|| AdMobLibraryTable {
                 enabled: true,
-                test_devices: vec![]
+                ad_units: Default::default(), // todo
+                test_devices: vec![] // todo
             }),
 
             google_map: invert::<_, anyhow::Error>(
