@@ -679,7 +679,10 @@ fn atom(lex: &mut Lexer) -> LogicParseResult<Expression> {
     lex.start();
 
     match lex.expect_multiple_choices(
-        vec![Token::Identifier, Token::String, Token::Number, Token::False, Token::True]
+        vec![
+            Token::Identifier, Token::String, Token::Number, Token::False, Token::True,
+            Token::LParen
+        ]
     )? {
         TokenWrapperOwned { token: Token::Identifier, slice, .. } => {
             lex.success();
@@ -711,6 +714,23 @@ fn atom(lex: &mut Lexer) -> LogicParseResult<Expression> {
             lex.success();
             Ok(Expression::Literal(Literal::Boolean(true)))
         }
+        TokenWrapperOwned { token: Token::LParen, .. } => {
+            lex.restore();
+
+            Ok(group(lex)?)
+        }
         _ => unreachable!()
     }
+}
+
+fn group(lex: &mut Lexer) -> LogicParseResult<Expression> {
+    lex.start();
+    lex.expect(Token::LParen)?;
+
+    let expression = expression(lex)?;
+
+    lex.expect(Token::RParen)?;
+    lex.success();
+
+    Ok(expression)
 }

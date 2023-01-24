@@ -21,7 +21,7 @@ Status: <b>Very alpha</b>. Project compilation works flawlessly. But there aren'
  - [ ] Component types
  - [ ] Resources are very much unimplemented
  - [ ] Custom views
- - [ ] I forgor to add parentheses to the grammar 💀
+ - [v] I forgor to add parentheses to the grammar 💀
  - [ ] Packaging of project files
  - [ ] Chaining function calls that are separated with newlies doesn't work, because the parser separates statements by newlines. Function chain calls that are separated with newlines will be interpreted as a separate statement and thus will be a parse error.
 

@@ -77,4 +77,7 @@ atom                    = identifier |
                           "true" |
                           "false" |
                           string |
-                          number
+                          number |
+                          group
+
+group                  = "(" expression ")"
