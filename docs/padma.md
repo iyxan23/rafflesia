@@ -117,7 +117,7 @@ respectively.
 At load, every padma definitions must be cached into memory with their respective lookup tables to prevent slow lookups
 during compilation.
 
-Or perhaps it would be better to load definitions that are needed (when other definitions have higher priorities).
+Or perhaps it would be better to lazy load definitions that are needed (when other definitions have higher priorities).
 
 ### Compilation
 
@@ -146,63 +146,34 @@ into rafflesia for better readability.
 
 ## Spec
 
-Block generation looks like this
+There are two files of padma: `.blks` and `.defs` files.
+
+### Blocks
+
+`.blks` files are files that define an opcode's spec and its attributes.
+
 ```text
                  - block type
-                 |              parameters
-                 |            -------  
-                 |            |     |  param name
-                 |            |     |  ---
-                 |            |_    |_ |__
-[operator]opcode(d): my block %s or %s.name
- -------- ------     ----------------------
- L category    |     L the spec
+                 |               parameters
+                 |             -------  
+                 |             |     |  param name
+                 |             |     |  ---
+                 |             |_    |_ |__
+[operator]opcode(d): "my block %s or %s.name"
+ -------- ------      ----------------------
+ L category    |      L the spec
                |
                L opcode
 ```
 
-Substacks
+`.defs` files are files that define the definitions that will be used in rafflesia.
+
 ```text
-[operator]opcode|: something %d
-                | 
-                L means that there's one substack (one nest),
-                  for two substacks, use ||
-```
-
-Member generation
-```text
-number:
-```
-There are only 
-
-Generating block from spec and opcode
-
-#### Regular block
-```text
-[variable]setVarString: set %m.varStr to %s
-```
-
-Will generate
-
-```rust
-pub fn set_var_string(name: String, value: ArgValue<String>) -> Block {
-    Block::new(
-        BlockCategory::Variable,
-        "setVarString".to_string(),
-        BlockContent::builder()
-            .text("set")
-            .arg(Argument::Menu {
-                name: "varStr".to_string(),
-                value: ArgValue::Value(name)
-            })
-            .text("to")
-            .arg(Argument::String { name: None, value })
-            .build(),
-        BlockType::Regular
-    )
+// will create a function called `toast` that accepts a string argument on the 0th position
+// and generates a `doToast` block with the 0th argument being passed onto doToast's 0th parameter
+toast(s) {
+  doToast(@0);
 }
 ```
-
-#### 
 
 > Block types can be seen on [Iyxan23/sketchware-data:data/block-opcodes.md](https://github.com/Iyxan23/sketchware-data/blob/main/data/block-opcodes.md)
