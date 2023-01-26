@@ -1,7 +1,7 @@
 use logos::Logos;
 use std::collections::HashMap;
 use crate::compiler::layout::parser::parser::Token;
-use crate::compiler::parser::LexerWrapper;
+use buffered_lexer::BufferedLexer;
 
 #[derive(Debug, PartialEq)]
 pub struct View {
@@ -12,8 +12,8 @@ pub struct View {
 }
 
 pub fn parse_layout(raw: &str) -> Result<View, parser::LayoutParseError> {
-    let mut lex: LexerWrapper<'_, Token>
-        = LexerWrapper::new(Token::lexer(raw), Token::Error);
+    let mut lex: BufferedLexer<'_, Token>
+        = BufferedLexer::new(Token::lexer(raw), Token::Error);
 
     // parse it :sunglasses:
     parser::view(&mut lex)
@@ -21,7 +21,7 @@ pub fn parse_layout(raw: &str) -> Result<View, parser::LayoutParseError> {
 
 mod parser {
     use std::collections::HashMap;
-    use crate::compiler::parser::{error, LexerWrapper, TokenWrapperOwned};
+    use buffered_lexer::{BufferedLexer, SpannedTokenOwned};
     use super::View;
     use logos::Logos;
 
@@ -57,10 +57,10 @@ mod parser {
         Error,
     }
 
-    pub type LayoutParseError = error::ParseError<Token, TokenWrapperOwned<Token>>;
+    pub type LayoutParseError = buffered_lexer::error::ParseError<Token, SpannedTokenOwned<Token>>;
 
     // this signature is ridiculous
-    pub fn view(lexer: &mut LexerWrapper<Token>) -> Result<View, LayoutParseError> {
+    pub fn view(lexer: &mut BufferedLexer<Token>) -> Result<View, LayoutParseError> {
         // todo: better error handling, see ariadne
         lexer.start();
 
@@ -98,7 +98,7 @@ mod parser {
         })
     }
 
-    pub fn attributes(lexer: &mut LexerWrapper<Token>)
+    pub fn attributes(lexer: &mut BufferedLexer<Token>)
         -> Result<HashMap<String, String>, LayoutParseError> {
 
         lexer.start();
@@ -131,7 +131,7 @@ mod parser {
         Ok(result)
     }
 
-    pub fn attribute(lexer: &mut LexerWrapper<Token>)
+    pub fn attribute(lexer: &mut BufferedLexer<Token>)
         -> Result<(String, String), LayoutParseError> {
         lexer.start();
 
@@ -144,14 +144,14 @@ mod parser {
         Ok((attr, value))
     }
 
-    pub fn value(lexer: &mut LexerWrapper<Token>) -> Result<String, LayoutParseError> {
+    pub fn value(lexer: &mut BufferedLexer<Token>) -> Result<String, LayoutParseError> {
         lexer.start();
 
         let res = match lexer.expect_multiple_choices(
             vec![Token::Text, Token::String]
         )? {
-            TokenWrapperOwned { token: Token::Text, slice, .. } => slice.to_string(),
-            TokenWrapperOwned { token: Token::String, slice, .. } =>
+            SpannedTokenOwned { token: Token::Text, slice, .. } => slice.to_string(),
+            SpannedTokenOwned { token: Token::String, slice, .. } =>
                 /* remove the `"` around it */
                 slice[1..slice.len() - 1].to_string(),
 
@@ -162,7 +162,7 @@ mod parser {
         Ok(res)
     }
 
-    pub fn children(lexer: &mut LexerWrapper<Token>) -> Result<Vec<View>, LayoutParseError> {
+    pub fn children(lexer: &mut BufferedLexer<Token>) -> Result<Vec<View>, LayoutParseError> {
         lexer.start();
 
         let mut result = Vec::new();

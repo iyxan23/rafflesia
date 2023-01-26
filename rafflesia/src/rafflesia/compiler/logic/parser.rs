@@ -1,12 +1,12 @@
 use anyhow::Result;
-use crate::compiler::parser::{error, LexerWrapper, TokenWrapper, TokenWrapperOwned};
+use buffered_lexer::{BufferedLexer, SpannedTokenOwned};
 use logos::Logos;
-use crate::compiler::parser::error::ParseError;
 use super::ast::*;
+use buffered_lexer::error::ParseError;
 
 pub fn parse_logic(raw: &str) -> LogicParseResult<OuterStatements> {
-    let mut lex: LexerWrapper<'_, Token>
-        = LexerWrapper::new(Token::lexer(raw), Token::Error);
+    let mut lex: BufferedLexer<'_, Token>
+        = BufferedLexer::new(Token::lexer(raw), Token::Error);
 
     outer_statements(&mut lex)
 }
@@ -78,9 +78,9 @@ pub enum Token {
     Error
 }
 
-pub type LogicParseError = ParseError<Token, TokenWrapperOwned<Token>>;
+pub type LogicParseError = ParseError<Token, SpannedTokenOwned<Token>>;
 pub type LogicParseResult<T> = Result<T, LogicParseError>;
-type Lexer<'a> = LexerWrapper<'a, Token>;
+type Lexer<'a> = BufferedLexer<'a, Token>;
 
 // todo: a "block" rule for `{ ... }`
 // todo: ..having newlines as a token is a bad idea. how do we know if a statement ends or is it
@@ -122,12 +122,12 @@ fn outer_statement(lex: &mut Lexer) -> LogicParseResult<OuterStatement> {
         vec![Token::NumberType, Token::StringType, Token::BooleanType, Token::MapType,
              Token::ListType, Token::Identifier]
     )? {
-        TokenWrapperOwned { token: Token::Identifier, .. } => outer_event_definition(lex),
-        TokenWrapperOwned {
+        SpannedTokenOwned { token: Token::Identifier, .. } => outer_event_definition(lex),
+        SpannedTokenOwned {
             token: Token::NumberType | Token::StringType | Token::BooleanType,
             ..
         } => outer_variable_declaration(lex),
-        TokenWrapperOwned {
+        SpannedTokenOwned {
             token: Token::MapType | Token::ListType,
             ..
         } => outer_complex_variable_declaration(lex),
@@ -144,9 +144,9 @@ fn simple_variable_type(lex: &mut Lexer) -> LogicParseResult<VariableType> {
     let res = match lex.expect_multiple_choices(
         vec![Token::NumberType, Token::StringType, Token::BooleanType]
     )? {
-        TokenWrapperOwned { token: Token::NumberType, .. } => VariableType::Number,
-        TokenWrapperOwned { token: Token::StringType, .. } => VariableType::String,
-        TokenWrapperOwned { token: Token::BooleanType, .. } => VariableType::Boolean,
+        SpannedTokenOwned { token: Token::NumberType, .. } => VariableType::Number,
+        SpannedTokenOwned { token: Token::StringType, .. } => VariableType::String,
+        SpannedTokenOwned { token: Token::BooleanType, .. } => VariableType::Boolean,
         _ => unreachable!()
     };
 
@@ -179,8 +179,8 @@ fn outer_complex_variable_declaration(lex: &mut Lexer) -> LogicParseResult<Outer
     let cx_var_tok_type = match lex.expect_multiple_choices(
         vec![Token::MapType, Token::ListType]
     )? {
-        TokenWrapperOwned { token: Token::MapType, .. } => ComplexVariableTokenType::Map,
-        TokenWrapperOwned { token: Token::ListType, .. } => ComplexVariableTokenType::List,
+        SpannedTokenOwned { token: Token::MapType, .. } => ComplexVariableTokenType::Map,
+        SpannedTokenOwned { token: Token::ListType, .. } => ComplexVariableTokenType::List,
         _ => unreachable!()
     };
 
@@ -256,7 +256,7 @@ fn inner_statements(lex: &mut Lexer) -> LogicParseResult<InnerStatements> {
         while let Some(_) = lex.expect_failsafe(Token::Newline) {}
 
         // check if we've reached the end (a closing brace)
-        let res = error::propagate_non_recoverable!(lex.expect_peek(Token::RBrace));
+        let res = buffered_lexer::propagate_non_recoverable!(lex.expect_peek(Token::RBrace));
         if res.is_ok() { break; }
 
         statements.0.push(inner_statement(lex)?);
@@ -270,24 +270,24 @@ fn inner_statement(lex: &mut Lexer) -> LogicParseResult<InnerStatement> {
     lex.start();
 
     let res = match lex.peek()? {
-        TokenWrapperOwned { token: Token::If, .. } =>
+        SpannedTokenOwned { token: Token::If, .. } =>
             InnerStatement::IfStatement(if_statement(lex)?),
-        TokenWrapperOwned { token: Token::Repeat, .. } =>
+        SpannedTokenOwned { token: Token::Repeat, .. } =>
             InnerStatement::RepeatStatement(repeat_statement(lex)?),
-        TokenWrapperOwned { token: Token::Forever, .. } =>
+        SpannedTokenOwned { token: Token::Forever, .. } =>
             InnerStatement::ForeverStatement(forever_statement(lex)?),
 
-        TokenWrapperOwned { token: Token::Break, .. } => {
+        SpannedTokenOwned { token: Token::Break, .. } => {
             lex.next().unwrap();
             InnerStatement::Break
         },
 
-        TokenWrapperOwned { token: Token::Continue, .. } => {
+        SpannedTokenOwned { token: Token::Continue, .. } => {
             lex.next().unwrap();
             InnerStatement::Continue
         },
 
-        TokenWrapperOwned { .. } => {
+        SpannedTokenOwned { .. } => {
             // can either be variable assignment or an expression (that can be a function or
             // something)
             // this is confusing af
@@ -395,7 +395,7 @@ fn expression(lex: &mut Lexer) -> LogicParseResult<Expression> {
     lex.start();
 
     // try to parse boolean expression
-    let bool_expr = error::propagate_non_recoverable_wo_eof!(boolean_expression(lex));
+    let bool_expr = buffered_lexer::propagate_non_recoverable_wo_eof!(boolean_expression(lex));
     if let Ok(expr) = bool_expr {
         lex.success();
         return Ok(expr);
@@ -404,7 +404,7 @@ fn expression(lex: &mut Lexer) -> LogicParseResult<Expression> {
     }
 
     // try again for atom
-    let atom = error::propagate_non_recoverable_wo_eof!(atom(lex));
+    let atom = buffered_lexer::propagate_non_recoverable_wo_eof!(atom(lex));
     if let Ok(expr) = atom {
         lex.success();
         return Ok(expr);
@@ -421,7 +421,7 @@ fn expression(lex: &mut Lexer) -> LogicParseResult<Expression> {
 macro_rules! token_to_binop {
     ($tok_var:ident, { $($tok:ident => $binop:ident),* }) => {
         match $tok_var {
-            $(TokenWrapperOwned { token: Token::$tok, .. } => BinaryOperator::$binop,)*
+            $(SpannedTokenOwned { token: Token::$tok, .. } => BinaryOperator::$binop,)*
             _ => unreachable!()
         }
     };
@@ -458,7 +458,7 @@ fn comparison_expression(lex: &mut Lexer) -> LogicParseResult<Expression> {
     lex.start();
 
     // "!" comparison-expression
-    if error::propagate_non_recoverable!(lex.expect_peek(Token::Not)).is_ok() {
+    if buffered_lexer::propagate_non_recoverable!(lex.expect_peek(Token::Not)).is_ok() {
         let expr = arithmetic_expression(lex)?;
 
         lex.success();
@@ -607,7 +607,7 @@ fn primary(lex: &mut Lexer) -> LogicParseResult<Expression> {
         let _ = lex.next();
 
         match tok {
-            TokenWrapperOwned { token: Token::DOT, .. } => {
+            SpannedTokenOwned { token: Token::DOT, .. } => {
                 let ident = lex.expect(Token::Identifier)?;
 
                 result = Expression::PrimaryExpression(PrimaryExpression::VariableAccess {
@@ -615,7 +615,7 @@ fn primary(lex: &mut Lexer) -> LogicParseResult<Expression> {
                     name: ident.slice
                 })
             }
-            TokenWrapperOwned { token: Token::LBracket, .. } => {
+            SpannedTokenOwned { token: Token::LBracket, .. } => {
                 let index_expr = expression(lex)?;
                 lex.expect(Token::RBracket)?;
 
@@ -624,7 +624,7 @@ fn primary(lex: &mut Lexer) -> LogicParseResult<Expression> {
                     index: Box::new(index_expr)
                 })
             }
-            TokenWrapperOwned { token: Token::LParen, .. }
+            SpannedTokenOwned { token: Token::LParen, .. }
             // only if the accumulator is a variable access
             if matches!(result, Expression::PrimaryExpression(PrimaryExpression::VariableAccess { .. }))
             => {
@@ -653,7 +653,7 @@ fn primary(lex: &mut Lexer) -> LogicParseResult<Expression> {
 fn arguments(lex: &mut Lexer) -> LogicParseResult<Arguments> {
     lex.start();
 
-    if error::propagate_non_recoverable!(lex.expect_peek(Token::RParen)).is_ok() {
+    if buffered_lexer::propagate_non_recoverable!(lex.expect_peek(Token::RParen)).is_ok() {
         return Ok(Arguments(vec![]));
     }
 
@@ -663,7 +663,7 @@ fn arguments(lex: &mut Lexer) -> LogicParseResult<Arguments> {
     arguments.push(first);
 
     while lex.expect_failsafe(Token::Comma).is_some() {
-        let r_paren = error::propagate_non_recoverable!(lex.expect(Token::RParen));
+        let r_paren = buffered_lexer::propagate_non_recoverable!(lex.expect(Token::RParen));
         lex.previous().unwrap();
         if r_paren.is_ok() { break; }
 
@@ -684,18 +684,18 @@ fn atom(lex: &mut Lexer) -> LogicParseResult<Expression> {
             Token::LParen
         ]
     )? {
-        TokenWrapperOwned { token: Token::Identifier, slice, .. } => {
+        SpannedTokenOwned { token: Token::Identifier, slice, .. } => {
             lex.success();
             Ok(Expression::PrimaryExpression(PrimaryExpression::VariableAccess {
                 from: None,
                 name: slice
             }))
         }
-        TokenWrapperOwned { token: Token::String, slice, .. } => {
+        SpannedTokenOwned { token: Token::String, slice, .. } => {
             lex.success();
             Ok(Expression::Literal(Literal::String(slice[1..slice.len() - 1].to_string())))
         }
-        TokenWrapperOwned { token: Token::Number, slice, pos } => {
+        SpannedTokenOwned { token: Token::Number, slice, pos } => {
             let num = slice.parse::<f64>()
                 .map_err(|_| ParseError::LexerError {
                     err_token: Token::Number,
@@ -706,15 +706,15 @@ fn atom(lex: &mut Lexer) -> LogicParseResult<Expression> {
             lex.success();
             Ok(Expression::Literal(Literal::Number(num)))
         }
-        TokenWrapperOwned { token: Token::False, .. } => {
+        SpannedTokenOwned { token: Token::False, .. } => {
             lex.success();
             Ok(Expression::Literal(Literal::Boolean(false)))
         }
-        TokenWrapperOwned { token: Token::True, .. } => {
+        SpannedTokenOwned { token: Token::True, .. } => {
             lex.success();
             Ok(Expression::Literal(Literal::Boolean(true)))
         }
-        TokenWrapperOwned { token: Token::LParen, .. } => {
+        SpannedTokenOwned { token: Token::LParen, .. } => {
             lex.restore();
 
             Ok(group(lex)?)
