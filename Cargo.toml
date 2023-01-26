@@ -1,19 +1,8 @@
-[package]
-name = "rafflesia"
-version = "0.1.0"
-edition = "2021"
-repository = "https://github.com/Iyxan23/rafflesia"
-readme = "README.md"
-description = "A langauge that compiles into sketchware projects"
-
-[lib]
-name = "rafflesia"
-path = "src/rafflesia/lib.rs"
-
-[[bin]]
-name = "rafflesia"
-test = false
-doc = false
+[workspace]
+members = [
+    "rafflesia",
+    "swrs",
+]
 
 # https://stackoverflow.com/a/54842093/9613353
 [profile.release]
@@ -22,24 +11,3 @@ lto = true
 codegen-units = 1
 panic = 'abort'
 strip = true
-
-[dev-dependencies]
-env_logger = "^0.9.0"
-
-[dependencies]
-swrs = { path = "./swrs" }
-clap = "^3.1.18"
-toml = "^0.5.9"
-chrono = "^0.4.19"
-serde = { version = "^1.0.137", features = ["derive"] }
-serde_derive = "^1.0.137"
-anyhow = "^1.0.57"
-thiserror = "^1.0.31"
-logos = "^0.12.0"
-log = "^0.4.17"
-
-console = "^0.15.0"
-ariadne = "^0.1.5"
-indicatif = "0.16.2"
-
-lazy_static = "^1.4.0"

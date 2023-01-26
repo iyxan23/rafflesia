@@ -6,7 +6,7 @@
 # | or
 # ? optional
 # ".." a terminal symbol / token
-# identifier an... identifier
+# identifier an identifier
 
 outer-statements        = (outer-statement "\n"+)*
 outer-statement         = variable-declaration |
@@ -81,3 +81,7 @@ atom                    = identifier |
                           group
 
 group                  = "(" expression ")"
+
+WHITESPACE             = " " | "\t" | "\n"
+
+COMMENT                = "//" .* "\n"
