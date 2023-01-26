@@ -9,7 +9,11 @@
       <sourceFolder url="file://$MODULE_DIR$/swrs/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/swrs/tests" isTestSource="true" />
       <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/padma-core/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/padma-derive/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
+      <excludeFolder url="file://$MODULE_DIR$/rafflesia/target" />
+      <excludeFolder url="file://$MODULE_DIR$/swrs/target" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />

@@ -1,0 +1,5 @@
+blocks = "\n"* (block | comment) "\n"+
+block = "[" CATEGORIES "]" \w+ type? ":" "\"" .+ "\""
+type = "(" TYPES ")"
+comment = "//" .+
+WHITESPACE = " " | "\t"
