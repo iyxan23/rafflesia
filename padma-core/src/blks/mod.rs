@@ -2,6 +2,7 @@ use regex::{Regex};
 use swrs::api::block::{BlockCategory, BlockContent, BlockType};
 
 pub mod error;
+mod tests;
 
 // todo: list, map, component, and view as block argument types
 
@@ -55,7 +56,7 @@ pub fn parse(data: &str) -> Result<BlockDefinitions, error::BlksParseError> {
         // .unwrap()s: these these values will never be None since the regex only matches when these groups matched
         let category = capture.get(1).unwrap().as_str();
         let opcode = capture.get(2).unwrap().as_str();
-        let blk_type = capture.get(3).map(|mat| mat.as_str()).unwrap_or("r"); // "r" means regular block
+        let blk_type = capture.get(3).map(|mat| mat.as_str()).unwrap_or(" ");
         let spec = capture.get(4).unwrap().as_str();
 
         result.push(BlockDefinition {
