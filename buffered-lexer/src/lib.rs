@@ -1,18 +1,23 @@
 //! # Buffered Lexer
-//! A wrapper to logos' [`logos:Lexer`] that adds a functionality where Lexer is able to be
+//! A wrapper to logos' [`logos::Lexer`] that adds a functionality where Lexer is able to be
 //! saved at a point and restored later on, with some caching/buffering functionalities and
-//! functions like [`BufferedLexer::expect`], [`BufferedLexer::expect_failsafe`], etc. that
-//! allows you to surf through tokens with ease.
+//! advanced token-advancing functions like [`BufferedLexer::expect`],
+//! [`BufferedLexer::expect_failsafe`], etc. that allows you to surf through tokens with ease.
 //! 
 //! You can construct an instance of this Lexer by passing the already provided logos'
 //! [`logos::Lexer`] and the error token of your logos-generated token enum.
 //! 
 //! ```
-//! // todo: make this testable
+//! use buffered_lexer::BufferedLexer;
 //! 
-//! let logos_lexer: logos::Lexer = new_lexer();
-//! let lexer = BufferedLexer::new(logos_lexer, Token::Error);
+//! // Your logos-generated Token
+//! #[derive(Logos, Debug, Clone)]
+//! enum Token {
+//!     // ...
+//!     Error
+//! }
 //! 
+//! let mut lexer: BufferedLexer<'_, Token> = BufferedLexer::new(Token::lexer(raw), Token::Error);
 //! // start using `lexer`
 //! ```
 //! 
@@ -101,6 +106,9 @@ impl<'source, T> BufferedLexer<'source, T>
         T: Logos<'source> + Debug + Clone + PartialEq,
         <<T as Logos<'source>>::Source as Source>::Slice: AsRef<str> {
 
+    /// Constructs a new [`BufferedLexer`] instance from a logos' generated Lexer ([`logos::Lexer`]).
+    /// This function takes an error token so in a case where the logos lexer encounters
+    /// an error while lexing, we can transform it into our own error [`error::ParseError::LexerError`].
     pub fn new(inner: Lexer<'source, T>, err_tok: T) -> BufferedLexer<'source, T> {
         BufferedLexer {
             inner,
