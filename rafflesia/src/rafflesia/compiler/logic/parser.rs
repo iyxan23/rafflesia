@@ -663,11 +663,9 @@ fn arguments(lex: &mut Lexer) -> LogicParseResult<Arguments> {
     arguments.push(first);
 
     while lex.expect_failsafe(Token::Comma).is_some() {
-        let r_paren = buffered_lexer::propagate_non_recoverable!(lex.expect(Token::RParen));
-        lex.previous().unwrap();
+        let r_paren = buffered_lexer::propagate_non_recoverable!(lex.expect_peek(Token::RParen));
         if r_paren.is_ok() { break; }
 
-        lex.previous().unwrap();
         arguments.push(expression(lex)?);
     }
 
