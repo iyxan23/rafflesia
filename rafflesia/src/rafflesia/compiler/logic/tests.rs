@@ -55,7 +55,7 @@ number a
 
 button1.onClick {
     toast("hello world")
-    returning_function().access.something[index]("call").another
+    returning_function().access.something[index].another
 }
 "#.trim();
 

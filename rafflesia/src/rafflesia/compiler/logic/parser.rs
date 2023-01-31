@@ -642,7 +642,7 @@ fn primary(lex: &mut Lexer) -> LogicParseResult<Expression> {
                     )
                 } else { unreachable!() }
             }
-            _ => unreachable!()
+            _ => break
         }
     }
 
