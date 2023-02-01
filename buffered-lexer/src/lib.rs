@@ -58,6 +58,9 @@ use std::fmt::Debug;
 use log::{info, trace};
 use logos::{Lexer, Logos, Source};
 
+#[cfg(test)]
+mod tests;
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct SpannedToken<'source, T: Debug + Clone + PartialEq> {
     pub token: T,
