@@ -8,15 +8,19 @@
 //! [`logos::Lexer`] and the error token of your logos-generated token enum.
 //! 
 //! ```
+//! use logos::Logos;
 //! use buffered_lexer::BufferedLexer;
 //! 
 //! // Your logos-generated Token
-//! #[derive(Logos, Debug, Clone)]
+//! #[derive(Logos, Debug, Clone, PartialEq)]
 //! enum Token {
 //!     // ...
+//! 
+//!     #[error]
 //!     Error
 //! }
-//! 
+//!
+//! let raw = "Hello world";
 //! let mut lexer: BufferedLexer<'_, Token> = BufferedLexer::new(Token::lexer(raw), Token::Error);
 //! // start using `lexer`
 //! ```
@@ -127,8 +131,8 @@ impl<'source, T> BufferedLexer<'source, T>
     }
 
     /// Called at the start of the parsing of a grammar; it will create a new save point or
-    /// "checkpoint" in which the Lexer can be restored onto by calling [`restore()`], unless it
-    /// got removed by calling [`success()`].
+    /// "checkpoint" in which the Lexer can be restored onto by calling [`BufferedLexer::restore`]
+    /// , unless it got removed by calling [`BufferedLexer::success`].
     pub fn start(&mut self) {
         trace!("{}==> New start point", "  ".repeat(self.save_points.len()));
         // push a new state start point
@@ -302,7 +306,7 @@ impl<'source, T> BufferedLexer<'source, T>
         res
     }
 
-    /// Opposite of [`LexerWrapper::expect`]
+    /// Opposite of [`BufferedLexer::expect`]
     pub fn not_expect(&mut self, tok: T)
         -> Result<SpannedTokenOwned<T>, error::ParseError<T, SpannedTokenOwned<T>>> {
 
@@ -328,7 +332,7 @@ impl<'source, T> BufferedLexer<'source, T>
 
     /// Go back one token, will use the cached token.
     ///
-    /// Will panic if previous gets called after a [`success()`] (it removes all the cache before
+    /// Will panic if previous gets called after a [`BufferedLexer::success`] (it removes all the cache before
     /// it)
     pub fn previous(&mut self) -> Option<&SpannedToken<T>> {
         let state_start_point = self.current_save_point()
@@ -347,7 +351,7 @@ impl<'source, T> BufferedLexer<'source, T>
         ret
     }
 
-    /// Peeks one token ahead. Basically does [`next()`] and then [`previous()`].
+    /// Peeks one token ahead. Basically does [`BufferedLexer::next`] and then [`BufferedLexer::previous`].
     pub fn peek(&mut self)
         -> Result<SpannedTokenOwned<T>, error::ParseError<T, SpannedTokenOwned<T>>> {
 
@@ -412,7 +416,7 @@ impl<'source, T> BufferedLexer<'source, T>
         self.index = state_start_point;
     }
 
-    /// Removes the current save point and **deletes** all the cached tokens before the current index
+    /// Pops the current save point and deletes all the cached tokens before the current index.
     pub fn success(&mut self) {
         // prevents splitting when there are multiple success calls at the end of parsing
         // (since there isn't any tokens left)
@@ -434,22 +438,22 @@ pub mod error {
     use std::error::Error;
     use std::fmt::{Debug, Display, Formatter};
 
-    pub enum ParseError<ET: Debug, UET: Debug> {
+    pub enum ParseError<ExpectedToken: Debug, UnexpectedToken: Debug> {
         // unexpected token
         UnexpectedTokenError {
-            expected: Option<Vec<ET>>,
-            unexpected_token: UET,
+            expected: Option<Vec<ExpectedToken>>,
+            unexpected_token: UnexpectedToken,
             pos: std::ops::Range<usize>,
         },
 
         // end of file
         EOF {
-            expected: Option<Vec<ET>>
+            expected: Option<Vec<ExpectedToken>>
         },
 
         // when the lexer wrapper encounters an Error token
         LexerError {
-            err_token: ET,
+            err_token: ExpectedToken,
             pos: std::ops::Range<usize>,
             slice: String
         }
