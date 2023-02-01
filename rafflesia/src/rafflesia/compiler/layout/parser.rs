@@ -148,7 +148,7 @@ mod parser {
         lexer.start();
 
         let res = match lexer.expect_multiple_choices(
-            vec![Token::Text, Token::String]
+            &vec![Token::Text, Token::String]
         )? {
             SpannedTokenOwned { token: Token::Text, slice, .. } => slice.to_string(),
             SpannedTokenOwned { token: Token::String, slice, .. } =>

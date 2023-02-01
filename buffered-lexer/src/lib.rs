@@ -270,7 +270,7 @@ impl<'source, T> BufferedLexer<'source, T>
 
     /// Expects if the next token is either of the token specified and return the token; otherwise
     /// it will return a [`error::ParseError::UnexpectedTokenError`]
-    pub fn expect_multiple_choices(&mut self, tokens: Vec<T>)
+    pub fn expect_multiple_choices(&mut self, tokens: &Vec<T>)
         -> Result<SpannedTokenOwned<T>, error::ParseError<T, SpannedTokenOwned<T>>> {
         self.current_save_point()
             .expect("start() must be called first");
@@ -288,7 +288,7 @@ impl<'source, T> BufferedLexer<'source, T>
             trace!("{} ! unexpected {:?} (expecting mult {:?})", "  ".repeat(self.save_points.len()), next, tokens);
 
             Err(error::ParseError::UnexpectedTokenError {
-                expected: Some(tokens),
+                expected: Some(tokens.clone()),
                 pos: next.pos.clone(),
                 unexpected_token: next.into(),
             })
@@ -301,7 +301,7 @@ impl<'source, T> BufferedLexer<'source, T>
                                    -> Result<SpannedTokenOwned<T>, error::ParseError<T, SpannedTokenOwned<T>>> {
         trace!("{} - peeking and expecting multiple choices", "  ".repeat(self.save_points.len()));
 
-        let res = self.expect_multiple_choices(tokens);
+        let res = self.expect_multiple_choices(&tokens);
         self.previous();
         res
     }

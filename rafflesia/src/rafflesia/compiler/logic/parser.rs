@@ -142,7 +142,7 @@ fn simple_variable_type(lex: &mut Lexer) -> LogicParseResult<VariableType> {
     lex.start();
 
     let res = match lex.expect_multiple_choices(
-        vec![Token::NumberType, Token::StringType, Token::BooleanType]
+        &vec![Token::NumberType, Token::StringType, Token::BooleanType]
     )? {
         SpannedTokenOwned { token: Token::NumberType, .. } => VariableType::Number,
         SpannedTokenOwned { token: Token::StringType, .. } => VariableType::String,
@@ -177,7 +177,7 @@ fn outer_complex_variable_declaration(lex: &mut Lexer) -> LogicParseResult<Outer
 
     // get the type
     let cx_var_tok_type = match lex.expect_multiple_choices(
-        vec![Token::MapType, Token::ListType]
+        &vec![Token::MapType, Token::ListType]
     )? {
         SpannedTokenOwned { token: Token::MapType, .. } => ComplexVariableTokenType::Map,
         SpannedTokenOwned { token: Token::ListType, .. } => ComplexVariableTokenType::List,
@@ -665,7 +665,7 @@ fn atom(lex: &mut Lexer) -> LogicParseResult<Expression> {
     lex.start();
 
     match lex.expect_multiple_choices(
-        vec![
+        &vec![
             Token::Identifier, Token::String, Token::Number, Token::False, Token::True,
             Token::LParen
         ]
