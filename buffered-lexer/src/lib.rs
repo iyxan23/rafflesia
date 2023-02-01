@@ -103,6 +103,7 @@ pub struct BufferedLexer<'source, T: Logos<'source> + Debug + Clone + PartialEq>
     inner_index: usize,
 
     save_points: Vec<usize>,
+    blacklist: Vec<T>,
     index: usize,
 
     err_tok: T
@@ -116,6 +117,9 @@ impl<'source, T> BufferedLexer<'source, T>
     /// Constructs a new [`BufferedLexer`] instance from a logos' generated Lexer ([`logos::Lexer`]).
     /// This function takes an error token so in a case where the logos lexer encounters
     /// an error while lexing, we can transform it into our own error [`error::ParseError::LexerError`].
+    ///
+    /// Calling this function will automatically start a new starting point. (As if you called
+    /// [`BufferedLexer::start`] after this new function).
     pub fn new(inner: Lexer<'source, T>, err_tok: T) -> BufferedLexer<'source, T> {
         BufferedLexer {
             inner,
@@ -123,6 +127,7 @@ impl<'source, T> BufferedLexer<'source, T>
             cache_start_point: 0,
             inner_index: 0,
             save_points: vec![0],
+            blacklist: vec![],
             index: 0,
             err_tok
         }
@@ -219,10 +224,16 @@ impl<'source, T> BufferedLexer<'source, T>
         self.current_save_point()
             .expect("start() must be called first");
 
-        let next: SpannedTokenOwned<T> = self.next()
-            .map_err(|err| err.map_eof_expected(|| vec![tok.clone()]))?
-            .clone()
-            .into();
+        // loop until the next token is not blacklisted
+        let next = loop {
+            let next: SpannedTokenOwned<T> = self.next()
+                .map_err(|err| err.map_eof_expected(|| vec![tok.clone()]))?
+                .clone()
+                .into();
+
+            if !self.blacklist.contains(&next.token) { break next; }
+        };
+
 
         if tok == next.token {
             trace!("{} - expected {:?}", "  ".repeat(self.save_points.len()), next);
@@ -401,6 +412,30 @@ impl<'source, T> BufferedLexer<'source, T>
         let _ = self.previous().unwrap();
 
         Ok(res)
+    }
+
+    /// Blacklists a token on [`BufferedLexer::expect`] or any similar functions.
+    /// 
+    /// When [`BufferedLexer::expect`] (or any similar functions) gets invoked and encounters any of
+    /// the token that got blacklisted, it will skip the token and process the next token.
+    pub fn blacklist(&mut self, tok: T) {
+        if !self.blacklist.contains(&tok) {
+            self.blacklist.push(tok);
+        }
+    }
+
+    /// Removes a token from the blacklist
+    /// 
+    /// Returns an [`Err(())`] if the provided token wasn't found on the blacklist.
+    pub fn remove_blacklist(&mut self, tok: T) -> Result<(), ()> {
+        self.blacklist.remove(
+            self.blacklist
+                .iter()
+                .position(|x| *x == tok)
+                .ok_or(())?
+        );
+
+        Ok(())
     }
 
     /// Restores the LexerWrapper into the previous save point.
