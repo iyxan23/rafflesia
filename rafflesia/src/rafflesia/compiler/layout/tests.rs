@@ -30,7 +30,7 @@ macro_rules! view {
         {
             let mut attributes = HashMap::new();
             $(attributes.insert(stringify!($attr_name).to_string(), $attr_value.to_string());)*
-            let mut children = Vec::new();
+            let children = Vec::new();
             $($(children.push($child);)*)?
 
             View {
@@ -64,6 +64,7 @@ macro_rules! view {
         {
             let mut attributes = HashMap::new();
             $(attributes.insert(stringify!($attr_name).to_string(), $attr_value.to_string());)*
+            #[allow(unused_mut)]
             let mut children = Vec::new();
             $($(children.push($child);)*)?
 

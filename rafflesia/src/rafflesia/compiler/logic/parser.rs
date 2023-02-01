@@ -323,18 +323,6 @@ fn inner_statement(lex: &mut Lexer) -> LogicParseResult<InnerStatement> {
     Ok(res)
 }
 
-fn variable_assignment(lex: &mut Lexer) -> LogicParseResult<VariableAssignment> {
-    lex.start();
-
-    // ident = expr
-    let identifier = lex.expect(Token::Identifier)?.slice;
-    lex.expect(Token::EQ)?;
-    let value = expression(lex)?;
-
-    lex.success();
-    Ok(VariableAssignment { identifier, value })
-}
-
 // todo: else ifs
 fn if_statement(lex: &mut Lexer) -> LogicParseResult<IfStatement> {
     lex.start();

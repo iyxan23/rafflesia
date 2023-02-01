@@ -1,5 +1,7 @@
 # PEG-like + BNF-like grammar, used only for reference
 
+# the parser code may not 100% represent what this grammar represents lol
+
 # () is a group
 # ..+ to match at least one or more
 # ..* to match at least zero or more

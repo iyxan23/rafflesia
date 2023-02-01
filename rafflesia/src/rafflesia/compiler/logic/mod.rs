@@ -1,11 +1,11 @@
 use std::fmt::Debug;
-use swrs::api::block::{ArgumentBlockReturnType, ArgValue, Block, Blocks, BlockType, ListItem};
+use swrs::api::block::{ArgumentBlockReturnType, ArgValue, Block, Blocks, BlockType};
 use swrs::api::component::ComponentKind;
 use swrs::api::screen::{EventType, MoreBlock};
 use swrs::api::screen::Event;
 use swrs::api::view::View;
 use swrs::parser::logic::list_variable::ListVariable;
-use swrs::parser::logic::variable::{Variable, VariableType as SWRSVariableType};
+use swrs::parser::logic::variable::Variable;
 use swrs::LinkedHashMap;
 use thiserror::Error;
 
@@ -395,7 +395,7 @@ fn compile_expression(
             ExprValue::ArgBlock(match operator {
                 UnaryOperator::Not => blocks::not(value.to_bool_arg()?),
                 UnaryOperator::Minus => blocks::minus_unary(value.to_num_arg()?),
-                UnaryOperator::Plus => blocks::minus_unary(value.to_num_arg()?),
+                UnaryOperator::Plus => blocks::plus_unary(value.to_num_arg()?),
             })
         }
 

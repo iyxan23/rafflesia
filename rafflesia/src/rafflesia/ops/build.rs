@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use anyhow::{bail, Context, Result};
-use ariadne::{Label, Report, ReportBuilder, ReportKind, sources};
+// use ariadne::{Label, Report, ReportBuilder, ReportKind, sources};
 use console::style;
 use indicatif::{ProgressBar, ProgressStyle};
 use swrs::api::screen::Screen;
-use swrs::api::{Colors, Libraries, Metadata, Resources, SketchwareProject};
+use swrs::api::SketchwareProject;
 use swrs::parser::file::{KeyboardSetting, Orientation, Theme};
 use swrs::parser::RawSketchwareProject;
 use crate::compiler;

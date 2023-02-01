@@ -10,6 +10,9 @@
 //   r#if if "if %b" control e
 // (substacks are determined from the block type)
 
+// this file is filled with definitions that might not be used in the codebase
+#![allow(dead_code, unused_variables)]
+
 use swrs::api::block::{
     Argument, ArgumentBlockReturnType, ArgValue, Block, BlockCategory, BlockContent, BlockControl,
     Blocks, BlockType
