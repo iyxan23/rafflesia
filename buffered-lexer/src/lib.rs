@@ -463,7 +463,7 @@ impl<'source, T> BufferedLexer<'source, T>
                 self.cached_tokens.split_off(self.index - self.cache_start_point - 1);
         }
 
-        self.cache_start_point = self.index - 1;
+        self.cache_start_point = if self.index != 0 { self.index - 1 } else { 0 };
 
         self.save_points.pop()
             .expect("Failed to pop the previous save point, is success() called after a start()?");
