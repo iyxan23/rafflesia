@@ -503,7 +503,7 @@ pub mod error {
         ($rule: expr) => {
             match $rule {
                 Ok(res) => Ok(res),
-                Err(er) => if !er.is_recoverable() { return Err(er) } else { Err(er) }
+                Err(er) => if !er.is_recoverable() { Err(er)? } else { Err(er) }
             }
         };
     }
@@ -514,7 +514,7 @@ pub mod error {
         ($rule: expr) => {
             match $rule {
                 Ok(res) => Ok(res),
-                Err(er) => if !er.is_recoverable_w_eof() { return Err(er) } else { Err(er) }
+                Err(er) => if !er.is_recoverable_w_eof() { Err(er)? } else { Err(er) }
             }
         };
     }
