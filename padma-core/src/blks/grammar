@@ -1,6 +1,0 @@
-// this file only serves as a reference
-
-blocks = "\n"* (block | comment) "\n"+
-block = "[" CATEGORIES "]" \w+ type? ":" "\"" .+ "\""
-type = "(" TYPES ")"
-WHITESPACE = " " | "\t"

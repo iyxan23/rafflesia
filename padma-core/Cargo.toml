@@ -6,7 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+buffered-lexer = { path = "../buffered-lexer" }
 swrs = { path = "../swrs" }
-thiserror = "^1.0.38"
-regex = "^1"
 
+thiserror = "^1.0.38"
+logos = "0.12.1"
