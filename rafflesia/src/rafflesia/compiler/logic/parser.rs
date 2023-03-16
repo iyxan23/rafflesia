@@ -119,7 +119,7 @@ fn outer_statement(lex: &mut Lexer) -> LogicParseResult<OuterStatement> {
 
     let res = match lex.expect_peek_multiple_choices(
         // expects a type, complex type, or an event identifier
-        vec![Token::NumberType, Token::StringType, Token::BooleanType, Token::MapType,
+        &[Token::NumberType, Token::StringType, Token::BooleanType, Token::MapType,
              Token::ListType, Token::Identifier]
     )? {
         SpannedTokenOwned { token: Token::Identifier, .. } => outer_event_definition(lex),
@@ -142,7 +142,7 @@ fn simple_variable_type(lex: &mut Lexer) -> LogicParseResult<VariableType> {
     lex.start();
 
     let res = match lex.expect_multiple_choices(
-        &vec![Token::NumberType, Token::StringType, Token::BooleanType]
+        &[Token::NumberType, Token::StringType, Token::BooleanType]
     )? {
         SpannedTokenOwned { token: Token::NumberType, .. } => VariableType::Number,
         SpannedTokenOwned { token: Token::StringType, .. } => VariableType::String,
@@ -177,7 +177,7 @@ fn outer_complex_variable_declaration(lex: &mut Lexer) -> LogicParseResult<Outer
 
     // get the type
     let cx_var_tok_type = match lex.expect_multiple_choices(
-        &vec![Token::MapType, Token::ListType]
+        &[Token::MapType, Token::ListType]
     )? {
         SpannedTokenOwned { token: Token::MapType, .. } => ComplexVariableTokenType::Map,
         SpannedTokenOwned { token: Token::ListType, .. } => ComplexVariableTokenType::List,
@@ -423,7 +423,7 @@ fn boolean_expression(lex: &mut Lexer) -> LogicParseResult<Expression> {
     let mut result = first_branch;
 
     while let Ok(tok) =
-        lex.expect_peek_multiple_choices(vec![Token::Or, Token::And]) {
+        lex.expect_peek_multiple_choices(&[Token::Or, Token::And]) {
 
         // skip the next token because we've peeked it
         let _ = lex.next();
@@ -460,7 +460,7 @@ fn comparison_expression(lex: &mut Lexer) -> LogicParseResult<Expression> {
     let mut result = first_branch;
 
     while let Ok(tok) =
-        lex.expect_peek_multiple_choices(vec![
+        lex.expect_peek_multiple_choices(&[
             Token::LT, Token::GT, Token::DEQ, Token::LTE, Token::GTE
         ]) {
 
@@ -491,7 +491,7 @@ fn arithmetic_expression(lex: &mut Lexer) -> LogicParseResult<Expression> {
     let mut result = first_branch;
 
     while let Ok(tok) =
-        lex.expect_peek_multiple_choices(vec![Token::Plus, Token::Minus]) {
+        lex.expect_peek_multiple_choices(&[Token::Plus, Token::Minus]) {
 
         // skip the next token because we've peeked it
         let _ = lex.next();
@@ -517,7 +517,7 @@ fn term(lex: &mut Lexer) -> LogicParseResult<Expression> {
     let mut result = first_branch;
 
     while let Ok(tok) =
-        lex.expect_peek_multiple_choices(vec![Token::Mult, Token::Div]) {
+        lex.expect_peek_multiple_choices(&[Token::Mult, Token::Div]) {
 
         // skip the next token because we've peeked it
         let _ = lex.next();
@@ -589,7 +589,7 @@ fn primary(lex: &mut Lexer) -> LogicParseResult<Expression> {
     let mut result = atom;
 
     while let Ok(tok) =
-        lex.expect_peek_multiple_choices(vec![Token::DOT, Token::LBracket, Token::LParen]) {
+        lex.expect_peek_multiple_choices(&[Token::DOT, Token::LBracket, Token::LParen]) {
 
         // skip the next token because we've peeked it
         let _ = lex.next();
