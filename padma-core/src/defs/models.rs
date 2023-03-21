@@ -12,6 +12,7 @@ pub struct FunctionSignature {
     pub this: Option<Type>,
     pub parameters: Vec<Type>,
     pub name: String,
+    pub return_type: Option<Type>
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -27,9 +28,10 @@ pub struct BlockDispatch {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum BlockArgument {
+    BlockDispatch(BlockDispatch),
     Argument { index: u32 },
     Literal(Literal),
-    This
+    This,
 }
 
 #[derive(Debug, Clone, PartialEq)]

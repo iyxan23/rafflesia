@@ -90,7 +90,7 @@ fn functions(lex: &mut Lexer) -> DefsParseResult<Definitions> {
 }
 
 fn function(lex: &mut Lexer) -> DefsParseResult<(FunctionSignature, FunctionDefinition)> {
-    let (parent, func_ident) = match lex.expect_multiple_choices(&[
+    let (this, func_ident) = match lex.expect_multiple_choices(&[
         Token::Identifier,
         Token::TypeBoolean, Token::TypeNumber, Token::TypeString
     ])? {
@@ -115,19 +115,13 @@ fn function(lex: &mut Lexer) -> DefsParseResult<(FunctionSignature, FunctionDefi
     let parameters = parameters(lex)?;
 
     // check if there is a `:` (indicating a return type)
-    let ret_type = lex.expect_failsafe(Token::Colon)?.map(|_| r#type(lex)).transpose()?;
+    let return_type = lex.expect_failsafe(Token::Colon)?.map(|_| r#type(lex)).transpose()?;
 
     // todo: check for the `=` sign that indicates binding
 
-    // todo: statements
+    let blocks = statements_block(lex)?;
 
-    Ok((FunctionSignature {
-        this: parent,
-        parameters,
-        name: func_ident.slice,
-    }, FunctionDefinition {
-        blocks: todo!(),
-    }))
+    Ok((FunctionSignature { this, parameters, name: func_ident.slice, return_type }, FunctionDefinition { blocks }))
 }
 
 // this function takes `(` and `)` tokens as well
@@ -179,26 +173,25 @@ fn statements_block(lex: &mut Lexer) -> DefsParseResult<Vec<BlockDispatch>> {
 
     // there are block dispatches in this statements block
     while !lex.expect_failsafe(Token::RBrace)?.is_some() {
-        blocks.extend(statement(lex)?);
+        blocks.push(statement(lex)?);
     }
 
     lex.success();
     Ok(blocks)
 }
 
-fn statement(lex: &mut Lexer) -> DefsParseResult<Vec<BlockDispatch>> {
+fn statement(lex: &mut Lexer) -> DefsParseResult<BlockDispatch> {
     lex.start();
 
-    // an identifier or an escaped identifier for the "block dispatch"
+    let block = block_dispatch(lex)?;
 
     lex.expect(Token::Semicolon)?;
     lex.success();
-    todo!()
+    Ok(block)
 }
 
-fn block_dispatch(lex: &mut Lexer) -> DefsParseResult<Vec<BlockDispatch>> {
+fn block_dispatch(lex: &mut Lexer) -> DefsParseResult<BlockDispatch> {
     lex.start();
-    let mut dispatches = vec![];
 
     // every block dispatches starts with `#`
     lex.expect(Token::Hashtag)?;
@@ -213,14 +206,14 @@ fn block_dispatch(lex: &mut Lexer) -> DefsParseResult<Vec<BlockDispatch>> {
         _ => unreachable!()
     };
 
-
+    let arguments = arguments(lex)?;
 
     lex.success();
-    Ok(dispatches)
+    Ok(BlockDispatch { opcode: identifier, arguments })
 }
 
 // also takes `(` `)`
-fn arguments(lex: &mut Lexer) -> DefsParseResult<Vec<BlockDispatch>> {
+fn arguments(lex: &mut Lexer) -> DefsParseResult<Vec<BlockArgument>> {
     lex.start();
     let mut arguments = vec![];
     lex.expect(Token::LParen)?;
@@ -231,18 +224,76 @@ fn arguments(lex: &mut Lexer) -> DefsParseResult<Vec<BlockDispatch>> {
         return Ok(arguments)
     }
 
-    // there are contents in the parentheses
+    let first = argument(lex)?;
+    arguments.push(first);
 
+    while lex.expect_failsafe(Token::Comma)?.is_some() {
+        let r_paren = propagate_non_recoverable!(lex.expect_peek(Token::RParen));
+        if r_paren.is_ok() { break; }
+
+        arguments.push(argument(lex)?);
+    }
 
     lex.success();
     Ok(arguments)
 }
 
 // basically arguments of dispatches
-fn expression(lex: &mut Lexer) -> DefsParseResult<BlockArgument> {
+fn argument(lex: &mut Lexer) -> DefsParseResult<BlockArgument> {
     lex.start();
     // can be a literal, or a call to another block, or an argument
+    Ok(match lex.expect_multiple_choices(&[
+        // literals
+        Token::LiteralFalse, Token::LiteralTrue, Token::LiteralString, Token::LiteralNumber,
 
-    lex.success();
-    todo!()
+        // identifier to another block
+        Token::Identifier, Token::EscapedIdentifier,
+
+        // an argument
+        Token::Argument, Token::ThisArgument,
+    ])? {
+        // ===> literals
+        SpannedTokenOwned { token: Token::LiteralTrue, .. } => {
+            lex.success();
+            BlockArgument::Literal(Literal::Boolean(true))
+        },
+        SpannedTokenOwned { token: Token::LiteralFalse, .. } => {
+            lex.success();
+            BlockArgument::Literal(Literal::Boolean(false))
+        },
+        SpannedTokenOwned { token: Token::LiteralString, mut slice, .. } => {
+            lex.success();
+            // remove its `"` `"`
+            slice.remove(0); slice.pop();
+            BlockArgument::Literal(Literal::String(slice))
+        },
+        SpannedTokenOwned { token: Token::LiteralNumber, slice, .. } => {
+            lex.success();
+            // safety: .unwrap() since the LiteralNumber token can only be of numbers as defined in the lexer
+            BlockArgument::Literal(Literal::Number(slice.parse().unwrap()))
+        },
+
+        // ===> identifiers (block dispatches)
+        SpannedTokenOwned { token: Token::Identifier | Token::EscapedIdentifier, .. } => {
+            // go back since we want to leave the parsing to `block_dispatch`
+            lex.previous();
+            lex.success();
+
+            BlockArgument::BlockDispatch(block_dispatch(lex)?)
+        }, 
+
+        // ===> arguments
+        SpannedTokenOwned { token: Token::Argument, mut slice, .. } => {
+            lex.success();
+            // remove the `@` in the front
+            slice.remove(0);
+            // safety: .unwrap() since the Argument token is guaranteed to be number after the `@`
+            BlockArgument::Argument { index: slice.parse().unwrap() }
+        },
+        SpannedTokenOwned { token: Token::ThisArgument, .. } => {
+            lex.success();
+            BlockArgument::This
+        },
+        _ => unreachable!()
+    })
 }
