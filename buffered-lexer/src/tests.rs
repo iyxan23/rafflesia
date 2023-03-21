@@ -102,9 +102,9 @@ fn expect_failsafe_0() {
 
     assert_eq!(
         lex.expect_failsafe(Token::Hello),
-        Some(crate::SpannedTokenOwned {
+        Ok(Some(crate::SpannedTokenOwned {
             token: Token::Hello, slice: "hello".to_string(), pos: 0..5
-        })
+        }))
     )
 }
 
@@ -113,7 +113,7 @@ fn expect_failsafe_1() {
     let raw = "hello world";
     let mut lex = create(raw);
 
-    assert_eq!(lex.expect_failsafe(Token::World), None);
+    assert_eq!(lex.expect_failsafe(Token::World), Ok(None));
 }
 
 #[test]

@@ -254,14 +254,15 @@ impl<'source, T> BufferedLexer<'source, T>
     /// when the error is unexpected token. Will not go back when the errors are either LexerError
     /// or EOF
     // fixme: LexerError doesnt get propagated, this is a really bad function
-    pub fn expect_failsafe(&mut self, tok: T) -> Option<SpannedTokenOwned<T>> {
+    pub fn expect_failsafe(&mut self, tok: T)
+        -> Result<Option<SpannedTokenOwned<T>>, error::ParseError<T, SpannedTokenOwned<T>>> {
         trace!("{} - expecting [failsafe] {:?}", "  ".repeat(self.save_points.len()), tok);
 
         match self.expect(tok) {
             Ok(res) => {
                 trace!("{} - expected [failsafe] {:?}", "  ".repeat(self.save_points.len()), &res);
 
-                Some(res)
+                Ok(Some(res))
             }
 
             Err(err) => {
@@ -270,14 +271,14 @@ impl<'source, T> BufferedLexer<'source, T>
                 if err.is_recoverable() {
                     trace!("{} v unexpected [failsafe]", "  ".repeat(self.save_points.len()));
                     self.previous();
+                    Ok(None)
                 } else {
                     trace!(
                         "{} v unexpected [failsafe] irrecoverable err: {}",
                         "  ".repeat(self.save_points.len()), err
                     );
+                    Err(err)
                 }
-
-                None
             }
         }
     }
@@ -476,6 +477,7 @@ pub mod error {
     use std::error::Error;
     use std::fmt::{Debug, Display, Formatter};
 
+    #[derive(PartialEq, Clone)]
     pub enum ParseError<ExpectedToken: Debug, UnexpectedToken: Debug> {
         // unexpected token
         UnexpectedTokenError {

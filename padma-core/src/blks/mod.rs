@@ -182,7 +182,7 @@ fn statement(lexer: &mut Lexer) -> BlksParseResult<BlockDefinition> {
         ident.slice
     };
 
-    let block_type = if let Some(_lparen) = lexer.expect_failsafe(Token::LParen) {
+    let block_type = if let Some(_lparen) = lexer.expect_failsafe(Token::LParen)? {
         // block type is specified
         let block_type_tok = lexer.expect_multiple_choices(&BLOCK_TYPES)?;
         lexer.expect(Token::RParen)?;
