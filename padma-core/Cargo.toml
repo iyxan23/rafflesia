@@ -5,6 +5,10 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[dev-dependencies]
+simple_logger = "4"
+log = "0.4"
+
 [dependencies]
 buffered-lexer = { path = "../buffered-lexer" }
 swrs = { path = "../swrs" }

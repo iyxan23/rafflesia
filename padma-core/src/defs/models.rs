@@ -34,7 +34,7 @@ pub enum BlockArgument {
     This,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Hash, Eq)]
 pub enum Type {
     Boolean,
     Number,
