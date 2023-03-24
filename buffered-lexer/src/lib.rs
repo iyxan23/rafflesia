@@ -568,9 +568,10 @@ pub mod error {
                                 f,
                                 "expected a {}, got {:?} instead",
                                 e.iter()
-                                    .fold(String::new(), |acc, tok| {
-                                        format!("{} or {:?}", acc, tok)
-                                    })[..3].to_string(), // removes the trailing ` or`
+                                    .skip(1)
+                                    // safety: .unwrap() because we wouldn't "didn't expect a token" if we don't expect anything.
+                                    .fold(format!("{:?}", e.iter().nth(0).unwrap()),
+                                        |acc, tok| format!("{} or {:?}", acc, tok)),
                                 unexpected_token
                             )
                         }
@@ -589,10 +590,10 @@ pub mod error {
                         } else {
                             write!(
                                 f,
-                                "expected a {}, but reached end-of-file",
+                                "expected a {:?}, but reached end-of-file",
                                 expected.iter()
                                     .fold(String::new(), |acc, tok| {
-                                        format!("{} or {:?}", acc, tok)
+                                        format!("{:?} or {:?}", acc, tok)
                                     })[..3].to_string(), // removes the trailing ` or`
                             )
                         }
@@ -601,7 +602,7 @@ pub mod error {
                     }
                 }
                 ParseError::LexerError { err_token, pos, slice } => {
-                    write!(f, "lexer error {:?} at {:?}: `{}`", err_token, pos, slice)
+                    write!(f, "lexer error {:?} at {:?}: `{:?}`", err_token, pos, slice)
                 }
             }
         }
