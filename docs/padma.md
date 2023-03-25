@@ -23,21 +23,24 @@ Padma definition files are:
 A quick look at them:
  - *`myblocks.blks`*
    ```text
-   [component]doToast: "toast %s"
-   [operator]&&(b): "%b and %b"
-   [operator]toString(s): "toString %n without decimal"
-   [operator]+(d): "%d + %d"
-   [operator]stringJoin(s): "%s join %s"
-   [operator]stringLength(d): "length of %d"
-   [math]random: "pick random %d to %d"
+   [component]doToast: "toast %s";
+   [operator]&&(b): "%b and %b";
+   [operator]toString(s): "toString %n without decimal";
+   [operator]+(d): "%d + %d";
+   [operator]stringJoin(s): "%s join %s";
+   [operator]stringLength(d): "length of %d";
+   [math]random: "pick random %d to %d";
    ```
  - *`myfuncs.defs`*
    ```text
-   toast(s) { doToast(@0); }
-   random: d = random;
+   toast(s) { #doToast(@0); }
+   random: d = #random;
    myFunc(s, s) {
-     doToast(stringJoin("First text: ", @0));
-     doToast(stringJoin("Second text: ", @1));
+       #doToast(#stringJoin("First text: ", @0));
+       #doToast(#stringJoin("Second text: ", @1));
+   }
+   returningFunc(): s {
+      < "what";
    }
    ```
    
@@ -49,7 +52,8 @@ Users have the ability to write and develop their own padma definitions.
 
 ### Inside a project
 
-Padma files should be placed on a folder called `custom` in a project directory.
+Padma files should be placed on a folder called `custom` in a project directory. (It is not necessary to do so, but for the
+sake of consistency for everyone, all of these files should be placed on one directory)
 
 ```text
 my-project
@@ -153,27 +157,52 @@ There are two files of padma: `.blks` and `.defs` files.
 `.blks` files are files that define an opcode's spec and its attributes.
 
 ```text
-                 - block type
-                 |               parameters
+                 - block type / return type
+                 |
+                 |             parameters
                  |             -------  
                  |             |     |  param name
                  |             |     |  ---
                  |             |_    |_ |__
-[operator]opcode(d): "my block %s or %s.name"
+[operator]opcode(d): "my block %s or %s.name"; <- necessary semicolon
  -------- ------      ----------------------
  L category    |      L the spec
                |
                L opcode
 ```
 
-`.defs` files are files that define the definitions that will be used in rafflesia.
+> Block types can be seen on [Iyxan23/sketchware-data:data/block-opcodes.md](https://github.com/Iyxan23/sketchware-data/blob/main/data/block-opcodes.md)
+
+### Defs
+
+`.defs` files are files that define the definitions (macros of blocks) that could be referenced and used in rafflesia.
+
+This is a simple example of a defs file that defines the definition `toast` with the first parameter being a string:
 
 ```text
-// will create a function called `toast` that accepts a string argument on the 0th position
+// will create a definition called `toast` that accepts a string argument on the 0th position
 // and generates a `doToast` block with the 0th argument being passed onto doToast's 0th parameter
 toast(s) {
-  doToast(@0);
+    #doToast(@0);
 }
+```
+
+We integrate this into a rafflesia project, and use it like this:
+
+```text
+onCreate {
+    // ...
+    toast("Hello world!");
+    // ...
+}
+```
+
+At compilation, rafflesia will produce the block:
+
+```text
+// ...
+opcode: doToast, spec: "toast %s", args: ["Hello world!"]
+// ...
 ```
 
 > Block types can be seen on [Iyxan23/sketchware-data:data/block-opcodes.md](https://github.com/Iyxan23/sketchware-data/blob/main/data/block-opcodes.md)
