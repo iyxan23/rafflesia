@@ -95,9 +95,6 @@ fn outer_statements(lex: &mut Lexer) -> LogicParseResult<OuterStatements> {
     let mut statements = OuterStatements(vec![]);
 
     loop {
-        // skip any newlines
-        while let Some(_) = lex.expect_failsafe(Token::Newline)? {}
-
         // break if we've reached EOF, but propagate lexer errors
         if let Err(err) = lex.peek() {
             match err {
@@ -106,6 +103,9 @@ fn outer_statements(lex: &mut Lexer) -> LogicParseResult<OuterStatements> {
                 _ => unreachable!()
             }
         }
+
+        // skip any newlines
+        while let Some(_) = lex.expect_failsafe_wo_eof(Token::Newline)? {}
 
         statements.0.push(outer_statement(lex)?);
     }
@@ -212,7 +212,7 @@ fn outer_event_definition(lex: &mut Lexer) -> LogicParseResult<OuterStatement> {
     let name = lex.expect(Token::Identifier)?.slice;
 
     // check if there is a dot after an identifier (means that it's a view listener)
-    if let Some(_) = lex.expect_failsafe(Token::DOT)? {
+    if let Some(_) = lex.expect_failsafe_wo_eof(Token::DOT)? {
         let event_name = lex.expect(Token::Identifier)?.slice;
 
         // parse the body of this event
@@ -253,7 +253,7 @@ fn inner_statements(lex: &mut Lexer) -> LogicParseResult<InnerStatements> {
 
     loop {
         // skip any newlines
-        while let Some(_) = lex.expect_failsafe(Token::Newline)? {}
+        while let Some(_) = lex.expect_failsafe_wo_eof(Token::Newline)? {}
 
         // check if we've reached the end (a closing brace)
         let res = buffered_lexer::propagate_non_recoverable!(lex.expect_peek(Token::RBrace));
@@ -336,7 +336,7 @@ fn if_statement(lex: &mut Lexer) -> LogicParseResult<IfStatement> {
     lex.expect(Token::RBrace)?;
 
     // check if there is an else
-    let else_body = if let Some(_) = lex.expect_failsafe(Token::Else)? {
+    let else_body = if let Some(_) = lex.expect_failsafe_wo_eof(Token::Else)? {
         lex.expect(Token::LBrace)?;
         let else_body = inner_statements(lex)?;
         lex.expect(Token::RBrace)?;
@@ -539,7 +539,7 @@ fn term(lex: &mut Lexer) -> LogicParseResult<Expression> {
 fn factor(lex: &mut Lexer) -> LogicParseResult<Expression> {
     lex.start();
 
-    if lex.expect_failsafe(Token::Plus)?.is_some() {
+    if lex.expect_failsafe_wo_eof(Token::Plus)?.is_some() {
         let factor = factor(lex)?;
 
         lex.success();
@@ -549,7 +549,7 @@ fn factor(lex: &mut Lexer) -> LogicParseResult<Expression> {
         })
     }
 
-    if lex.expect_failsafe(Token::Minus)?.is_some() {
+    if lex.expect_failsafe_wo_eof(Token::Minus)?.is_some() {
         let factor = factor(lex)?;
 
         lex.success();
@@ -567,7 +567,7 @@ fn power(lex: &mut Lexer) -> LogicParseResult<Expression> {
     lex.start();
     let primary = primary(lex)?;
 
-    Ok(if lex.expect_failsafe(Token::Pow)?.is_some() {
+    Ok(if lex.expect_failsafe_wo_eof(Token::Pow)?.is_some() {
         let power = power(lex)?;
 
         lex.success();
@@ -650,7 +650,7 @@ fn arguments(lex: &mut Lexer) -> LogicParseResult<Arguments> {
     let first = expression(lex)?;
     arguments.push(first);
 
-    while lex.expect_failsafe(Token::Comma)?.is_some() {
+    while lex.expect_failsafe_wo_eof(Token::Comma)?.is_some() {
         let r_paren = buffered_lexer::propagate_non_recoverable!(lex.expect_peek(Token::RParen));
         if r_paren.is_ok() { break; }
 

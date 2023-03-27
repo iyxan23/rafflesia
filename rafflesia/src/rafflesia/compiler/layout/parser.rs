@@ -68,7 +68,7 @@ mod parser {
         let name = lexer.expect(Token::Text)?.slice;
 
         let attributes = lexer
-            .expect_failsafe(Token::LParentheses)?
+            .expect_failsafe_wo_eof(Token::LParentheses)?
             .map(|_| {
                 lexer.previous();
                 attributes(lexer)
@@ -76,7 +76,7 @@ mod parser {
             .transpose()?;
 
         let children = lexer
-            .expect_failsafe(Token::LBrace)?
+            .expect_failsafe_wo_eof(Token::LBrace)?
             .map(|_| {
                 lexer.previous();
                 Ok(Box::new(children(lexer)?))
@@ -84,7 +84,7 @@ mod parser {
             .transpose()?;
 
         // fixme: maybe use a new func for this?
-        let view_id = if lexer.expect_failsafe(Token::Colon)?.is_some() {
+        let view_id = if lexer.expect_failsafe_wo_eof(Token::Colon)?.is_some() {
             Some(lexer.expect(Token::Text)?.slice.to_string())
         } else { None };
 
@@ -106,7 +106,7 @@ mod parser {
 
         let mut result = HashMap::new();
 
-        if lexer.expect_failsafe(Token::RParentheses)?.is_some() {
+        if lexer.expect_failsafe_wo_eof(Token::RParentheses)?.is_some() {
             // welp I guess theres nothing here
             return Ok(result);
         }
@@ -115,7 +115,7 @@ mod parser {
         let first = attribute(lexer)?;
         result.insert(first.0, first.1);
 
-        while lexer.expect_failsafe(Token::Comma)?.is_some() {
+        while lexer.expect_failsafe_wo_eof(Token::Comma)?.is_some() {
             // check if next is a closing parentheses, means this is a trailing comma
             if lexer.expect_peek(Token::RParentheses).is_ok() { break; }
 
@@ -171,7 +171,7 @@ mod parser {
         lexer.expect(Token::LBrace)?;
 
         // check if it already ended :l
-        if lexer.expect_failsafe(Token::RBrace)?.is_some() {
+        if lexer.expect_failsafe_wo_eof(Token::RBrace)?.is_some() {
             // welp i guess theres nothing here
             return Ok(result);
         }
@@ -179,7 +179,7 @@ mod parser {
         let first = view(lexer)?;
         result.push(first);
 
-        while lexer.expect_failsafe(Token::Comma)?.is_some() {
+        while lexer.expect_failsafe_wo_eof(Token::Comma)?.is_some() {
             // check if next is a closing brace, means this is a trailing comma
             if lexer.expect_peek(Token::RBrace).is_ok() { break; }
 

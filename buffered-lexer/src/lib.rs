@@ -283,6 +283,37 @@ impl<'source, T> BufferedLexer<'source, T>
         }
     }
 
+    /// Checks if the next token is as the token given, then return the token. Otherwise, go back
+    /// when the error is unexpected token. Will not go back when the error is a LexerError.
+    // fixme: LexerError doesnt get propagated, this is a really bad function
+    pub fn expect_failsafe_wo_eof(&mut self, tok: T)
+        -> Result<Option<SpannedTokenOwned<T>>, error::ParseError<T, SpannedTokenOwned<T>>> {
+        trace!("{} - expecting [failsafe w/o eof] {:?}", "  ".repeat(self.save_points.len()), tok);
+
+        match self.expect(tok) {
+            Ok(res) => {
+                trace!("{} - expected [failsafe w/o eof] {:?}", "  ".repeat(self.save_points.len()), &res);
+
+                Ok(Some(res))
+            }
+
+            Err(err) => {
+                // only go back when the error is recoverable (unexpected token)
+                if err.is_recoverable_w_eof() {
+                    trace!("{} v unexpected [failsafe w/o eof]", "  ".repeat(self.save_points.len()));
+                    self.previous();
+                    Ok(None)
+                } else {
+                    trace!(
+                        "{} v unexpected [failsafe w/o eof] irrecoverable err: {}",
+                        "  ".repeat(self.save_points.len()), err
+                    );
+                    Err(err)
+                }
+            }
+        }
+    }
+
     /// Expects if the next token is either of the token specified and return the token; otherwise
     /// it will return a [`error::ParseError::UnexpectedTokenError`]
     pub fn expect_multiple_choices(&mut self, tokens: &[T])
