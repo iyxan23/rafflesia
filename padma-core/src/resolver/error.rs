@@ -1,13 +1,21 @@
-use super::models::Type;
+use thiserror::Error;
 
+use crate::defs::models::Type;
+
+#[derive(Error, Debug)]
 pub enum ResolveError {
-    MultipleBlk,
-    MultipleDef,
-    
+    #[error("too many arguments given")]
     TooManyArguments,
+    #[error("")]
     TooLittleArguments,
+    #[error("")]
     InvalidArgumentType {
         given: Type,
         required: Type,
     },
+
+    #[error("")]
+    CyclicDependency,
+    #[error("")]
+    BlockNotFound,
 }

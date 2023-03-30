@@ -1,5 +1,7 @@
 use swrs::api::block::BlockContent;
 
+use crate::defs::models::Type;
+
 pub struct Definition {
     pub blocks: DefinitionBlocks,
     pub signature: Signature,
@@ -41,14 +43,4 @@ pub enum Argument {
     Block(Block),
     Argument(u32),
     This,
-}
-
-pub enum Type {
-    Boolean,
-    Number,
-    String,
-    // View,
-    // Component,
-    // List,
-    // Map,
 }
