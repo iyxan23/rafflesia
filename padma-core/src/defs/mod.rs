@@ -14,6 +14,9 @@
 //    may be defined in a .blks file, but this parser does not
 //    care about that file. It only parses a .defs file and that's it
 
+// todo: a method call inside def
+// todo: convert to chumsky :>
+
 pub mod error;
 pub mod models;
 
@@ -280,6 +283,7 @@ fn statements_block(lex: &mut Lexer) -> DefsParseResult<Vec<Dispatch>> {
 fn statement(lex: &mut Lexer) -> DefsParseResult<Dispatch> {
     lex.start();
 
+    // todo: methods
     let block = block_dispatch(lex)?;
 
     lex.expect(Token::Semicolon)?;

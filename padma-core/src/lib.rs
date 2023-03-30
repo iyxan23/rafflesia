@@ -1,5 +1,6 @@
 pub mod blks;
 pub mod defs;
+pub mod resolver;
 
 // Read and parse .blks files
 // Read and parse .defs files

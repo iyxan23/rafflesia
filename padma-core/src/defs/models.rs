@@ -10,7 +10,7 @@ pub struct Definitions {
 }
 
 /// Represents a signature of a defined function.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)] // <- needed for it to be HashMap keys
 pub struct FunctionSignature {
     pub this: Option<Type>,
     pub parameters: Vec<Type>,
