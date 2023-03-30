@@ -20,6 +20,7 @@ function(b, d, s) {
 
 test(s) {
     #`$escaped$%^@*!!name!?!?`(@0);
+    call_to_another_func(@0, "literally");
 }
 "#;
     let defs = parse_defs(code).unwrap();

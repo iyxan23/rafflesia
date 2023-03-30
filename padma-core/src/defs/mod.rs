@@ -255,7 +255,7 @@ fn r#type(lex: &mut Lexer) -> DefsParseResult<Type> {
 }
 
 // also parses the `{` `}`
-fn statements_block(lex: &mut Lexer) -> DefsParseResult<Vec<BlockDispatch>> {
+fn statements_block(lex: &mut Lexer) -> DefsParseResult<Vec<Dispatch>> {
     lex.start();
     let mut blocks = vec![];
 
@@ -277,7 +277,7 @@ fn statements_block(lex: &mut Lexer) -> DefsParseResult<Vec<BlockDispatch>> {
     Ok(blocks)
 }
 
-fn statement(lex: &mut Lexer) -> DefsParseResult<BlockDispatch> {
+fn statement(lex: &mut Lexer) -> DefsParseResult<Dispatch> {
     lex.start();
 
     let block = block_dispatch(lex)?;
@@ -287,12 +287,12 @@ fn statement(lex: &mut Lexer) -> DefsParseResult<BlockDispatch> {
     Ok(block)
 }
 
-fn block_dispatch(lex: &mut Lexer) -> DefsParseResult<BlockDispatch> {
+fn block_dispatch(lex: &mut Lexer) -> DefsParseResult<Dispatch> {
     lex.start();
 
-    // every block dispatches starts with `#`
-    lex.expect(Token::Hashtag)?;
-
+    // check whether it's a raw block or call to another function
+    let raw_block = lex.expect_failsafe(Token::Hashtag)?.is_some();
+    
     let identifier =
         match lex.expect_multiple_choices(&[Token::Identifier, Token::EscapedIdentifier])? {
             SpannedTokenOwned {
@@ -316,8 +316,9 @@ fn block_dispatch(lex: &mut Lexer) -> DefsParseResult<BlockDispatch> {
     let arguments = arguments(lex)?;
 
     lex.success();
-    Ok(BlockDispatch {
-        opcode: identifier,
+    Ok(Dispatch {
+        kind: if raw_block { DispatchKind::RawBlock } else { DispatchKind::FunctionDispatch },
+        identifier,
         arguments,
     })
 }
@@ -403,7 +404,7 @@ fn argument(lex: &mut Lexer) -> DefsParseResult<BlockArgument> {
                 lex.previous();
                 lex.success();
 
-                BlockArgument::BlockDispatch(block_dispatch(lex)?)
+                BlockArgument::Dispatch(block_dispatch(lex)?)
             }
 
             // ===> arguments

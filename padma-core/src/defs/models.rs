@@ -1,3 +1,5 @@
+/// Top-level structure, represents the whole file. Contains definitions
+/// of a definition file.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Definitions {
     pub global_functions: Vec<(FunctionSignature, FunctionDefinition)>,
@@ -7,6 +9,7 @@ pub struct Definitions {
     // pub primitive_exprs: Vec<()>,
 }
 
+/// Represents a signature of a defined function.
 #[derive(Debug, Clone, PartialEq)]
 pub struct FunctionSignature {
     pub this: Option<Type>,
@@ -15,20 +18,32 @@ pub struct FunctionSignature {
     pub return_type: Option<Type>
 }
 
+/// The acutal function's implementation.
 #[derive(Debug, Clone, PartialEq)]
 pub struct FunctionDefinition {
-    pub blocks: Vec<BlockDispatch>
+    pub blocks: Vec<Dispatch>
 }
 
+/// A dispatch, may be a raw block or a function call from the same
+/// defs or other defs file that gets merged together.
 #[derive(Debug, Clone, PartialEq)]
-pub struct BlockDispatch {
-    pub opcode: String,
+pub struct Dispatch {
+    pub kind: DispatchKind,
+    pub identifier: String,
     pub arguments: Vec<BlockArgument>
+}
+
+/// A dispatch, may be a raw block or a function call from the same
+/// defs or other defs file that gets merged together.
+#[derive(Debug, Clone, PartialEq)]
+pub enum DispatchKind {
+    RawBlock,
+    FunctionDispatch,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum BlockArgument {
-    BlockDispatch(BlockDispatch),
+    Dispatch(Dispatch),
     Argument { index: u32 },
     Literal(Literal),
     This,
