@@ -2,7 +2,7 @@ The `padma` function notation to represent a function signature.
 
 > Block types (s, d, b) can be seen on [Iyxan23/sketchware-data:data/block-opcodes.md](https://github.com/Iyxan23/sketchware-data/blob/main/data/block-opcodes.md)
 
-### Defining functions
+## Defining functions
 
 ```text
 // regular functions
@@ -32,7 +32,7 @@ d.name = block;
 //   and so on..
 ```
 
-### Writing code
+## Writing code
 
 Raw block opcodes has a `#` prefix on them.
 
@@ -122,89 +122,3 @@ doOtherThing(s) { ... }
 returning(): s { ... }
 d.toString(): s = toString;
 ```
-
-#### Nested?
-
-Currently there is no way to use nested functions, because it would be hard to return a value inside
-these nested if statements. It is currently not possible because these blocks translate into raw blocks
-and we can't have an "inline if statement", for example.
-
-One seemingly possible workaround is to implicitly transfer where the caller used the function inside the nest.
-
-So, for example (imaginary syntax):
-
-```
-// takes a boolean and return a human string of it
-getString(b): s {
-    #ifElse(@0) {
-        // first nest
-        #myBlock();
-        < "It's true!";
-    } {
-        // second nest
-        #myOtherBlock();
-        < "It's false!";
-    };
-}
-```
-
-If we use this in rafflesia as:
-
-```text
-my_str = getString(true);
-toast(getString(true));
-```
-
-This code would be generated as (pseudo-code block representation syntax):
-
-```
-// the variable assignment
-0: ifElse "true" substack1=2 substack2=4
-1: myBlock
-2: setVarStr "my_str" "It's true!"
-3: myOtherBlock
-4: setVarStr "my_str" "It's false!"
-
-// the toast function call
-5: ifElse "true" substack1=7 substack2=9
-6: myBlock
-7: toast "It's true!"
-8: myOtherBlock
-9: toast "It's false!"
-```
-
-One problem that I found is what will happen if there are more code after the return statement? Like, returning a value early.
-
-```
-getString(b): s {
-    #if(@0) {
-        #myBlock();
-        < "It's true!";
-    };
-
-    #myOtherBlock();
-    < "It's false!";
-}
-```
-
-```
-my_str = getString(true);
-```
-
-Generated blocks (simplified syntax):
-```
-if "true" {
-    myBlock
-    setVarString "my_str" "It's true"
-    // ??? 
-}
-
-myOtherBlock
-setVarString "It's false!"
-```
-
-The problem is that padma defs files aren't real functions, they don't have a scope and can't return something.
-They're more like macros to generate blocks. We shouldn't treat padma defs files as to defining functions,
-but rather defining macros.
-
-Perhaps we could disallow returns to happen inside nests?
