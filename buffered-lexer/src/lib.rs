@@ -253,7 +253,6 @@ impl<'source, T> BufferedLexer<'source, T>
     /// Checks if the next token is as the token given, then return the token. Otherwise, go back
     /// when the error is unexpected token. Will not go back when the errors are either LexerError
     /// or EOF
-    // fixme: LexerError doesnt get propagated, this is a really bad function
     pub fn expect_failsafe(&mut self, tok: T)
         -> Result<Option<SpannedTokenOwned<T>>, error::ParseError<T, SpannedTokenOwned<T>>> {
         trace!("{} - expecting [failsafe] {:?}", "  ".repeat(self.save_points.len()), tok);
@@ -285,7 +284,6 @@ impl<'source, T> BufferedLexer<'source, T>
 
     /// Checks if the next token is as the token given, then return the token. Otherwise, go back
     /// when the error is unexpected token. Will not go back when the error is a LexerError.
-    // fixme: LexerError doesnt get propagated, this is a really bad function
     pub fn expect_failsafe_wo_eof(&mut self, tok: T)
         -> Result<Option<SpannedTokenOwned<T>>, error::ParseError<T, SpannedTokenOwned<T>>> {
         trace!("{} - expecting [failsafe w/o eof] {:?}", "  ".repeat(self.save_points.len()), tok);
