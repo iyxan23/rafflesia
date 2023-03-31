@@ -21,7 +21,8 @@ pub struct FunctionSignature {
 /// The acutal function's implementation.
 #[derive(Debug, Clone, PartialEq)]
 pub struct FunctionDefinition {
-    pub blocks: Vec<Dispatch>
+    pub statements: Vec<Dispatch>,
+    pub return_statement: Option<Dispatch>,
 }
 
 /// A dispatch, may be a raw block or a function call from the same
@@ -30,7 +31,11 @@ pub struct FunctionDefinition {
 pub struct Dispatch {
     pub kind: DispatchKind,
     pub identifier: String,
-    pub arguments: Vec<BlockArgument>
+    pub arguments: Vec<BlockArgument>,
+    
+    // only exists if `DispatchKind` is `FunctionDispatch` this field
+    // is used to represent a method call of a defined function
+    pub this: Option<Box<BlockArgument>>,
 }
 
 /// A dispatch, may be a raw block or a function call from the same

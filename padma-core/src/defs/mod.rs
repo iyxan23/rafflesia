@@ -16,6 +16,7 @@
 
 // todo: a method call inside def
 // todo: convert to chumsky :>
+// todo: implement returning types
 
 pub mod error;
 pub mod models;
@@ -28,7 +29,9 @@ use std::collections::HashMap;
 use buffered_lexer::{BufferedLexer, SpannedTokenOwned, error::ParseError};
 use error::DefsParseError;
 use logos::Logos;
-use models::*;
+
+// also export the models
+pub use models::*;
 
 pub fn parse_defs(raw: &str) -> DefsParseResult<Definitions> {
     let mut lex: BufferedLexer<'_, Token> = BufferedLexer::new(Token::lexer(raw), Token::Error);
@@ -197,7 +200,7 @@ fn function(lex: &mut Lexer) -> DefsParseResult<(FunctionSignature, FunctionDefi
 
     // todo: check for the `=` sign that indicates binding
 
-    let blocks = statements_block(lex)?;
+    let (statements, return_statement) = statements_block(lex)?;
 
     Ok((
         FunctionSignature {
@@ -206,7 +209,10 @@ fn function(lex: &mut Lexer) -> DefsParseResult<(FunctionSignature, FunctionDefi
             name: func_ident.slice,
             return_type,
         },
-        FunctionDefinition { blocks },
+        FunctionDefinition {
+            statements,
+            return_statement
+        },
     ))
 }
 
@@ -258,9 +264,13 @@ fn r#type(lex: &mut Lexer) -> DefsParseResult<Type> {
 }
 
 // also parses the `{` `}`
-fn statements_block(lex: &mut Lexer) -> DefsParseResult<Vec<Dispatch>> {
+// returns:
+//   .0 -> the actual statements inside the function
+//   .1 -> the return statement (if it exists)
+fn statements_block(lex: &mut Lexer) -> DefsParseResult<(Vec<Dispatch>, Option<Dispatch>)> {
     lex.start();
     let mut blocks = vec![];
+    let mut return_statement = None;
 
     // open up `{`
     lex.expect(Token::LBrace)?;
@@ -268,16 +278,25 @@ fn statements_block(lex: &mut Lexer) -> DefsParseResult<Vec<Dispatch>> {
     // check if this is empty
     if lex.expect_failsafe(Token::RBrace)?.is_some() {
         // return early
-        return Ok(blocks);
+        return Ok((blocks, return_statement));
     }
 
     // there are block dispatches in this statements block
     while !lex.expect_failsafe(Token::RBrace)?.is_some() {
-        blocks.push(statement(lex)?);
+        // check if there is a `<` which indicates a return statement
+        if lex.expect_failsafe(Token::Return)?.is_some() {
+            // we then parse it as a regular statement, and then expect for `}`
+            return_statement = Some(statement(lex)?);
+
+            lex.expect(Token::RBrace)?;
+            break;
+        } else {
+            blocks.push(statement(lex)?);
+        }
     }
 
     lex.success();
-    Ok(blocks)
+    Ok((blocks, return_statement))
 }
 
 fn statement(lex: &mut Lexer) -> DefsParseResult<Dispatch> {
@@ -324,6 +343,7 @@ fn block_dispatch(lex: &mut Lexer) -> DefsParseResult<Dispatch> {
         kind: if raw_block { DispatchKind::RawBlock } else { DispatchKind::FunctionDispatch },
         identifier,
         arguments,
+        this: None, // todo: implement method call parsing
     })
 }
 
