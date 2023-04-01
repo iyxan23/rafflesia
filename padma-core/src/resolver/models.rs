@@ -14,7 +14,7 @@ pub enum Signature {
         name: String,
         this: Option<Type>,
         ret_type: Option<Type>,
-        arguments: Vec<Type>,
+        parameter_types: Vec<Type>,
     },
     // todo: Expression(Expression)
 }
@@ -51,7 +51,12 @@ pub struct Block {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Argument {
     Literal(crate::defs::models::Literal),
-    Block(Block), // todo: an argument may not only be a block, but can be many
+
+    // note: for an argument of a function that might return multiple blocks
+    //       the last / returning block is set as the argument, and the rest
+    //       are appended with the resulting blocks list.
+    Block(Block),
+
     Argument(u32),
     This,
 }

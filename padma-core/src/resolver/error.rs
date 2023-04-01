@@ -14,8 +14,9 @@ pub enum ResolveError {
     TooLittleArguments,
     #[error("type mismatch, needed argument {:?}, given {:?}", required, given)]
     InvalidArgumentType {
-        given: Type,
-        required: Type,
+        // These two fields are `None` when they are treated as regular statements.
+        given: Option<Type>,
+        required: Option<Type>,
     },
 
     #[error("cyclic dependency, a function could not recursively call itself")]
