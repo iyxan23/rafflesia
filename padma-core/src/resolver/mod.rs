@@ -30,6 +30,13 @@ pub struct Resolver {
 }
 
 impl Resolver {
+
+    /// Creates a new instance of [`Resolver`] with the provided block [`blks::BlockDefinitions`] and
+    /// defs [`defs::Definitions`].
+    /// 
+    /// Note: If there are multiple definitions of the same opcode provided in `blks`, they will
+    /// implicitly get overriden by a definition located on a higher index. This also applies for
+    /// defs but the same function signature.
     pub fn new(blks: Vec<blks::BlockDefinitions>, defs: Vec<defs::Definitions>) -> Self {
         let mut resolver = Self::default();
 
@@ -212,6 +219,8 @@ impl Resolver {
                     .ok_or_else(|| ResolveError::BlockNotFound { opcode: block.identifier.clone() })?
                     .clone();
 
+                let mut argument_blocks = vec![];
+
                 // resolve its arguments
                 let arguments = block.arguments.iter()
                     .map::<Result<Argument, ResolveError>, _>(|arg| {
@@ -220,7 +229,16 @@ impl Resolver {
                         // returns the block directly (`Block` variant)
                         Ok(match arg {
                             defs::BlockArgument::Dispatch(disp) => {
-                                todo!("resolve dispatch, use the last as argument, let rest be added into the return value")
+                                let (blocks, return_block) = self.resolve_dispatch(
+                                    disp,
+                                    visited, cache,
+                                    parent_parameter_types, parent_this_type, parent_required_type
+                                )?;
+
+                                argument_blocks.extend(blocks);
+                                assert!(matches!(return_block, Some(_)));
+
+                                Argument::Block(return_block.unwrap())
                             },
                             defs::BlockArgument::Argument { index } => Argument::Argument(*index),
                             defs::BlockArgument::Literal(lit) => Argument::Literal(lit.clone()),
