@@ -185,11 +185,6 @@ fn function(lex: &mut Lexer) -> DefsParseResult<(FunctionSignature, FunctionDefi
         _ => unreachable!(),
     };
 
-    println!(
-        "got function ident and type: {:?}, {}",
-        this, func_ident.slice
-    );
-
     let parameters = parameters(lex)?;
 
     // check if there is a `:` (indicating a return type)

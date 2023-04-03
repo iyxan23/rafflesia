@@ -1,6 +1,6 @@
 use buffered_lexer::{error, SpannedTokenOwned};
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum DefsParseError {
     ParseError(error::ParseError<super::Token, SpannedTokenOwned<super::Token>>),
 }
