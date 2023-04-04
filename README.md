@@ -1,9 +1,16 @@
-<h1 align="center"><pre>rafflesia</pre></h1>
+<h1 align=center><pre>rafflesia</pre></h1>
 
-A language that compiles to sketchware projects
+<p align=center>A language that compiles to sketchware projects</p>
 
+<table align=center>
+<tr>
+<th>Logic</th>
+<th>Layout</th>
+</tr>
+<tr>
+<td>
 
-```txt
+```
 number counter
 
 onCreate {
@@ -16,19 +23,26 @@ button.onClick {
 }
 ```
 
-Status: <b>Very alpha</b>. Project compilation works flawlessly. But there aren't much functions yet, and there are some broken/unimplemented features:
- - [ ] Map and List types (so-called as complex types in the codebase)
- - [ ] Component types
- - [ ] Resources are very much unimplemented
- - [ ] Custom views
- - [v] I forgor to add parentheses to the grammar 💀
- - [ ] Packaging of project files
- - [ ] Chaining function calls that are separated with newlies doesn't work, because the parser separates statements by newlines. Function chain calls that are separated with newlines will be interpreted as a separate statement and thus will be a parse error.
+</td>
+<td>
 
-Cool things to do
- - [ ] A WASM application so users wont need to install rust do unnecessary stuff to test rafflesia.
- - [ ] Direct block coding, so users can manually insert sketchware blocks in their raw form. Just like using asm as in C.
- - [ ] Shadow types for Maps. Since maps aren't typed in sketchware (they're just `HashMap<String, Object>`), it would be nice to have a type-safe map in rafflesia.
- - [ ] Direct java code insertion using something like blockquotes <code>```</code>
+```text
+LinearLayout (
+    orientation: vertical,
+    layout_width: match_parent,
+    layout_height: match_parent,
+    gravity: center
+) {
+    Button (text: "Count"): button
+}
+```
 
-[Learn more](docs/rafflesia-overview.md)
+</td>
+</tr>
+</table>
+
+<pre align=center>
+$ rafflesia build
+</pre>
+
+<p align=center><a href="docs/rafflesia-overview.md">Learn more</a></p>
