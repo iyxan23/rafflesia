@@ -2,23 +2,48 @@ html,
 body {
   height: 100%;
   margin: 0;
-}
 
-body {
-  align-items: center;
-  display: flex;
-  justify-content: center;
-
-  font-size: 1.5rem;
-}
-
-main {
-  color: black;
   font-family: sans-serif;
-  text-align: center;
 }
 
-h1 + .subtitle {
-  display: block;
-  margin-top: -1em;
+.parent {
+  height: 100vh;
+  width: 100vw;
+
+  padding: 1rem;
+  box-sizing: border-box;
+
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  grid-template-rows: repeat(6, 1fr);
+  grid-column-gap: 0px;
+  grid-row-gap: 0px;
+}
+
+.left-panel {
+  grid-area: 1 / 1 / 5 / 3;
+
+  display: flex;
+  flex-direction: column;
+  gap: .5rem;
+}
+
+.code {
+  grid-area: 1 / 3 / 5 / 8;
+  display: flex;
+  flex-direction: column;
+  gap: .25rem;
+}
+
+.code > .filename {
+  font-family: monospace;
+}
+
+.code > textarea {
+  flex-grow: 1;
+  resize: none;
+}
+
+.under {
+  grid-area: 5 / 1 / 7 / 8;
 }
