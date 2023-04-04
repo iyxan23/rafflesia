@@ -46,7 +46,8 @@ Moreblocks can't have a return type so it makes sense for us to not be able to s
 Currently component types doesn't exist yet. But I mean why not, for fun? :>
 
 ```
-firebasedb fdb;
+firebasedb fdb(path: "/somewhere");
+sharedpreferences sp(path: "what");
 gyroscope gs;
 
 string name;
