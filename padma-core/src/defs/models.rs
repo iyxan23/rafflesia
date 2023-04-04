@@ -49,7 +49,7 @@ pub enum DispatchKind {
 #[derive(Debug, Clone, PartialEq)]
 pub enum BlockArgument {
     Dispatch(Dispatch),
-    Argument { index: u32 },
+    Argument { index: usize },
     Literal(Literal),
     This,
 }

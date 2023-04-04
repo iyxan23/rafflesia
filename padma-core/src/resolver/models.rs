@@ -57,6 +57,6 @@ pub enum Argument {
     //       are appended with the resulting blocks list.
     Block(Block),
 
-    Argument(u32),
+    Argument(usize),
     This,
 }

@@ -20,6 +20,9 @@ use self::models::{Definition, Block, Signature, Argument};
 pub mod models;
 pub mod error;
 
+#[cfg(test)]
+mod tests;
+
 pub struct Resolver {
     blocks: HashMap<String, blks::BlockDefinition>,
 
@@ -82,9 +85,9 @@ impl Resolver {
     }
 
     /// Resolves all the definitions with the blocks previously given,
-    /// will return a [`Definition`] which contains each of definitions'
-    /// blocks representation.
-    pub fn resolve(mut self) -> Result<Definition, ResolveError> {
+    /// will return a [`HashMap<Signature, Definition>`] which contains
+    /// each of definitions' blocks representation.
+    pub fn resolve(mut self) -> Result<HashMap<Signature, Definition>, ResolveError> {
         // gogogogo
         let mut cache = HashMap::new();
 
@@ -116,7 +119,40 @@ impl Resolver {
             cache.insert(signature, definition);
         }
 
-        todo!()
+        // also do it for methods
+        while !self.methods.is_empty() {
+            let typ = self.methods.keys().next().unwrap().clone();
+            // safety: .unwrap() is safe because the `while` block above
+            //         makes sure that this block is run only when the hashmap
+            //         is not empty
+
+            while !self.methods.get(&typ).unwrap().is_empty() {
+                let type_methods = self.methods.get_mut(&typ).unwrap();
+                let key = type_methods.keys().next().unwrap().clone();
+                // safety: .unwrap() is safe, see comments above
+                
+                let func = type_methods.remove(&key).unwrap();
+                // safety: .unwrap() is safe because we got the key from the hashmap
+
+                // we then resolve its signature and definitions using `resolve_definitions()`
+                let (signature, definition) =
+                    self.resolve_definitions(
+                        &mut cache,
+                        key, func,
+
+                        &mut vec![],
+
+                        None
+                    )?;
+
+                cache.insert(signature, definition);
+            }
+        
+            // after we've done with that type we remove it
+            self.methods.remove(&typ);
+        }
+
+        Ok(cache)
     }
 
     // Resolves a `FunctionSignature` and `FunctionDefinition`
@@ -150,7 +186,9 @@ impl Resolver {
 
                 // we shouldn't have any return block since we set the `parent_required_type`
                 // into None.
-                assert!(matches!(return_block, None));
+                if return_block.is_some() {
+                    return Err(ResolveError::ReturningExpressionAsStatement);
+                }
 
                 acc.extend(blocks);
                 Ok(acc)
@@ -196,7 +234,7 @@ impl Resolver {
     // then somehow bind it into `cache`, since those values belong to the `cache` HashMap.
     fn resolve_dispatch(
         &mut self,
-        block: &defs::Dispatch,
+        dispatch: &defs::Dispatch,
 
         // this `visited` parameter is used to prevent cyclic dependency,
         // as we traverse down into calls of functions, we check on each
@@ -210,64 +248,138 @@ impl Resolver {
 
         parent_parameter_types: &Vec<defs::Type>,
         parent_this_type: Option<&defs::Type>,
+
+        // `resolve_dispatch` doesn't check if the dispatch given coerces 
+        // to this type vvv
         parent_required_type: Option<&defs::Type>,
     ) -> Result<(Vec<Block>, Option<Block>), ResolveError> {
-        Ok(match block.kind {
+        Ok(match dispatch.kind {
             defs::DispatchKind::RawBlock => {
                 // take a block that matches the opcode
-                let def = self.blocks.get(&block.identifier)
-                    .ok_or_else(|| ResolveError::BlockNotFound { opcode: block.identifier.clone() })?
+                let def = self.blocks.get(&dispatch.identifier)
+                    .ok_or_else(|| ResolveError::BlockNotFound { opcode: dispatch.identifier.clone() })?
                     .clone();
 
-                let mut argument_blocks = vec![];
+                let def_args = def.spec.get_args();
+                
+                if def_args.len() > dispatch.arguments.len() {
+                    return Err(ResolveError::TooManyArguments);
+                }
+
+                let mut result = vec![];
 
                 // resolve its arguments
-                let arguments = block.arguments.iter()
-                    .map::<Result<Argument, ResolveError>, _>(|arg| {
+                let arguments = def_args.into_iter()
+                    .enumerate()
+                    .map::<Result<Argument, ResolveError>, _>(|(idx, arg)| {
+                        let spec_type = Self::swrs_arg_to_type(arg);
+                        let Some(given_argument) = dispatch.arguments.get(idx) else {
+                            return Err(ResolveError::TooLittleArguments);
+                        };
+
+                        let given_argument_type = self.def_block_argument_as_type(
+                            given_argument,
+                            visited, cache,
+                            parent_parameter_types, parent_this_type,
+                            Some(&spec_type)
+                        )?;
+
+                        // check if the two matches
+                        if spec_type != given_argument_type {
+                            return Err(ResolveError::InvalidArgumentType {
+                                given: Some(given_argument_type),
+                                required: Some(spec_type)
+                            });
+                        }
+
                         // convert defs' `BlockArgument` into our `Argument` type
                         // defs' `BlockArgument` has a `Dispatch` variant, whilst our type
                         // returns the block directly (`Block` variant)
-                        Ok(match arg {
+                        Ok(match given_argument {
                             defs::BlockArgument::Dispatch(disp) => {
+                                // this is a dispatch to either a raw block or a function call
                                 let (blocks, return_block) = self.resolve_dispatch(
                                     disp,
                                     visited, cache,
-                                    parent_parameter_types, parent_this_type, parent_required_type
+
+                                    parent_parameter_types, parent_this_type,
+                                    Some(&given_argument_type)
                                 )?;
 
-                                argument_blocks.extend(blocks);
-                                assert!(matches!(return_block, Some(_)));
+                                // make sure that `return_block` actually returns something
+                                let Some(return_block) = return_block else {
+                                    return Err(ResolveError::InvalidArgumentType {
+                                        given: None, required: Some(given_argument_type)
+                                    });
+                                };
 
-                                Argument::Block(return_block.unwrap())
+                                // check if it's the same type
+                                if let Some(return_type) = &return_block.return_type {
+                                    if return_type != &given_argument_type {
+                                        return Err(ResolveError::InvalidArgumentType {
+                                            given: return_block.return_type.clone(),
+                                            required: Some(given_argument_type)
+                                        });
+                                    }
+                                } else {
+                                    return Err(ResolveError::InvalidArgumentType {
+                                        given: None,
+                                        required: Some(given_argument_type)
+                                    });
+                                }
+
+                                result.extend(blocks);
+
+                                Argument::Block(return_block)
                             },
-                            defs::BlockArgument::Argument { index } => Argument::Argument(*index),
+
+                            // these types are guaranteed to be correct, since we've done the
+                            // checking a few lines above
                             defs::BlockArgument::Literal(lit) => Argument::Literal(lit.clone()),
+                            defs::BlockArgument::Argument { index } => Argument::Argument(*index),
                             defs::BlockArgument::This => Argument::This,
                         })
                     }).collect::<Result<Vec<Argument>, _>>()?;
-                
-                let block_type = Self::def_block_type_as_type(&def.block_type);
-                let parent_required_type = parent_required_type.cloned();
-                
-                // check if this raw block matches with the `parent_required_type`
-                if block_type == parent_required_type {
-                    // doesn't match! incorrect argument type passed
-                    return Err(ResolveError::InvalidArgumentType {
-                        given: block_type,
-                        required: parent_required_type
-                    });
-                }
 
-                (vec![], Some(Block {
-                    opcode: def.opcode,
-                    spec: def.spec,
-                    arguments,
-                    return_type: block_type
-                }))
+                let block_type = Self::def_block_type_as_type(&def.block_type);
+
+                // `resolve_dispatch` doesn't care about whether the block type coerces
+                // to the parent's required type
+
+                // let parent_required_type = parent_required_type.cloned();
+
+                // // check if this raw block matches with the `parent_required_type`
+                // if block_type != parent_required_type {
+                //     // doesn't match! incorrect argument type passed
+                //     return Err(ResolveError::InvalidArgumentType {
+                //         given: block_type,
+                //         required: parent_required_type
+                //     });
+                // }
+
+                // if it has a block type, it must be a returning block
+                // if not then add to the result and set None for the return block
+                if let Some(_) = block_type {
+                    (result, Some(Block {
+                        opcode: def.opcode,
+                        spec: def.spec,
+                        arguments,
+                        return_type: block_type
+                    }))
+                } else {
+                    result.push(Block {
+                        opcode: def.opcode,
+                        spec: def.spec,
+                        arguments,
+                        return_type: block_type
+                    });
+
+                    (result, None)
+                }
             },
             defs::DispatchKind::FunctionDispatch => {
                 // convert this dispatch's defs' signature to our own Signature
-                let this_type = block.this.as_ref()
+                let this_type = dispatch.this.as_ref()
                         .map(|block_arg|
                             self.def_block_argument_as_type(
                                 block_arg.as_ref(),
@@ -278,7 +390,7 @@ impl Resolver {
                         // flip `Option<Result<A, B>>` into `Result<Option<A>, B>`
                         .map_or(Ok(None), |v| v.map(Some))?;
 
-                let parameter_types = block.arguments.iter()
+                let parameter_types = dispatch.arguments.iter()
                         .map(|arg|
                             self.def_block_argument_as_type(
                                 arg,
@@ -290,12 +402,12 @@ impl Resolver {
                 let defs_signature = defs::FunctionSignature {
                     this: this_type.clone(),
                     parameters: parameter_types.clone(),
-                    name: block.identifier.clone(),
+                    name: dispatch.identifier.clone(),
                     return_type: parent_required_type.cloned(),
                 };
                 
                 let signature = Signature::Function {
-                    name: block.identifier.clone(),
+                    name: dispatch.identifier.clone(),
                     this: this_type.clone(),
                     ret_type: parent_required_type.cloned(),
                     parameter_types,
@@ -429,29 +541,20 @@ impl Resolver {
         })
     }
 
-    /// converts an [`&Argument`] into a [`defs::Type`]. Returns `None` if the argument tries to access
-    /// `this` but it's none, or either it tries to use a block as an argument, but the block
-    /// doesn't return anything.
-    // todo: Result type, and probably move this into `TryFrom<Argument>`
-    fn argument_to_type(
-        arg: &Argument,
-
-        parent_parameter_types: &Vec<defs::Type>,
-        parent_this_type: Option<&defs::Type>,
-    ) -> Option<defs::Type> {
-        Some(match arg {
-            Argument::Literal(lit) => Self::literal_to_type(lit),
-            Argument::Block(block) => block.return_type.clone()?,
-            Argument::Argument(arg) => parent_parameter_types.get(*arg as usize)?.clone(),
-            Argument::This => parent_this_type?.clone(),
-        })
-    }
-
     fn literal_to_type(lit: &defs::Literal) -> defs::Type {
         match lit {
             defs::Literal::Boolean(_) => defs::Type::Boolean,
             defs::Literal::Number(_) => defs::Type::Number,
             defs::Literal::String(_) => defs::Type::String,
+        }
+    }
+
+    fn swrs_arg_to_type(arg: &swrs::api::block::Argument) -> defs::Type {
+        match arg {
+            swrs::api::block::Argument::String { .. } => defs::Type::String,
+            swrs::api::block::Argument::Number { .. } => defs::Type::Number,
+            swrs::api::block::Argument::Boolean { .. } => defs::Type::Boolean,
+            swrs::api::block::Argument::Menu { .. } => todo!("how to get view/component/map/list types from menu?"),
         }
     }
 }
