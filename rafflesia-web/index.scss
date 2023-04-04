@@ -1,0 +1,24 @@
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+
+  font-size: 1.5rem;
+}
+
+main {
+  color: black;
+  font-family: sans-serif;
+  text-align: center;
+}
+
+h1 + .subtitle {
+  display: block;
+  margin-top: -1em;
+}

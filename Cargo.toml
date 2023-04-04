@@ -1,11 +1,14 @@
 [workspace]
 members = [
     "rafflesia",
+    # this is wasm-compiled
+    # "rafflesia-web",
     "swrs",
     "padma-core",
     "padma-derive",
     "buffered-lexer",
 ]
+exclude = ["rafflesia-web"]
 
 # https://stackoverflow.com/a/54842093/9613353
 [profile.release]
