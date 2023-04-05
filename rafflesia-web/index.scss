@@ -6,30 +6,34 @@ body {
   font-family: sans-serif;
 }
 
+* { box-sizing: border-box; }
+
 .parent {
   height: 100vh;
   width: 100vw;
 
   padding: 1rem;
-  box-sizing: border-box;
 
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  grid-template-rows: repeat(6, 1fr);
-  grid-column-gap: 0px;
-  grid-row-gap: 0px;
+  display: flex;
+  flex-direction: column;
+}
+
+.parent > .top-part {
+  flex-grow: 4;
+
+  display: flex;
+  flex-direction: row;
 }
 
 .left-panel {
-  grid-area: 1 / 1 / 5 / 3;
-
+  flex-grow: 1;
   display: flex;
   flex-direction: column;
   gap: .5rem;
 }
 
 .code {
-  grid-area: 1 / 3 / 5 / 8;
+  flex-grow: 4;
   display: flex;
   flex-direction: column;
   gap: .25rem;
@@ -45,5 +49,18 @@ body {
 }
 
 .under {
-  grid-area: 5 / 1 / 7 / 8;
+  flex-grow: 1;
+  max-height: 20vh;
+}
+
+.node {
+  user-select: none;
+}
+
+.node > .children {
+  margin-left: 1rem;
+}
+
+.node > .title.selected {
+  font-weight: bold;
 }
