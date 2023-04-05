@@ -1,5 +1,6 @@
 mod app;
 mod tree;
+mod template;
 mod virtfs;
 
 use app::App;
