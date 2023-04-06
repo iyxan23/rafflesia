@@ -75,14 +75,14 @@ impl Entry {
         } else {
             let depth = depth.unwrap_or(0);
 
-            match &self {
+            match self {
                 Entry::Folder { id, children } => {
-                    let next_folder = children.get(&path[depth])
+                    let next_folder = children.get_mut(&path[depth])
                     .ok_or_else(|| IOError::PathDoesntExist {
                         path: path.iter().map(ToString::to_string).collect()
                     })?;
                     
-                    self.get_entry_mut(path, Some(depth + 1))
+                    next_folder.get_entry_mut(path, Some(depth + 1))
                 },
                 Entry::File { id, content } => {
                     // file doesnt have children!

@@ -82,20 +82,20 @@ pub fn default() -> VirtualFs {
     vfs
 }
 
-pub fn virtfs_as_node(root_name: &str, virtfs: &VirtualFs) -> Arc<Node> {
-    virtfs_entry_as_node(root_name, virtfs.get_root())
+pub fn virtfs_as_node(root_name: &str, virtfs: &VirtualFs, selected_id: &str) -> Arc<Node> {
+    virtfs_entry_as_node(root_name, virtfs.get_root(), selected_id)
 }
 
-pub fn virtfs_entry_as_node(name: &str, entry: &Entry) -> Arc<Node> {
+pub fn virtfs_entry_as_node(name: &str, entry: &Entry, selected_id: &str) -> Arc<Node> {
     match entry {
         Entry::File { id, .. } =>
-            Arc::new(Node::new_file(id, name, false)),
+            Arc::new(Node::new_file(id, name, selected_id == id)),
         Entry::Folder { id, children } =>
             Arc::new(Node::new_folder(
                 id, name,
                 children.iter()
                     .map(|(name, entry)|
-                        virtfs_entry_as_node(name, entry))
+                        virtfs_entry_as_node(name, entry, selected_id))
                     .collect()
                 )),
     }
