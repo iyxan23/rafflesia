@@ -2,7 +2,7 @@ html,
 body {
   height: 100%;
   margin: 0;
-
+  
   font-family: sans-serif;
 }
 
@@ -11,44 +11,36 @@ body {
 .parent {
   height: 100vh;
   width: 100vw;
-
+  
   padding: 1rem;
-
+  
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   gap: 1rem;
   
-  .top-part {
-    flex-grow: 4;
-
-    display: flex;
-    flex-direction: row;
-    gap: 1rem;
-  }
-}
-
-.left-panel {
-  max-width: 20rem;
-  flex-grow: 1;
-  display: flex;
-  flex-direction: column;
-  gap: .5rem;
-}
-
-.code {
-  flex-grow: 4;
-  display: flex;
-  flex-direction: column;
-  gap: .25rem;
-
-  .filename {
-    font-family: monospace;
-  }
-
-  textarea {
+  .left-panel {
+    max-width: 20rem;
     flex-grow: 1;
-    resize: none;
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
   }
+  
+  .code {
+    flex-grow: 4;
+    display: flex;
+    flex-direction: column;
+    gap: .25rem;
+    
+    .filename {
+      font-family: monospace;
+    }
+    
+    textarea {
+      flex-grow: 1;
+      resize: none;
+    }
+  } 
 }
 
 .under {
@@ -64,33 +56,33 @@ body {
     margin-top: .1rem;
     color: blue;
   }
-
+  
   &.file {
     color: red;
   }
-
+  
   &.collapsed .children {
-    opacity: 0;
-    translate: 0 -1rem;
     pointer-events: none;
+    display: none;
   }
-
+  
   .children {
     margin-left: 1rem;
-    translate: 0 0;
-    transition: all 100ms linear;
   }
-
+  
   .title.selected {
     font-weight: bold;
   }
-
+  
   .title {
     display: flex;
     z-index: 5;
-
+    
+    .text {
+      flex-grow: 1;
+    }
+    
     .actions {
-      margin-left: auto;
       display: flex;
       gap: .25rem;
     }

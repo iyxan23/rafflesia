@@ -137,6 +137,34 @@ impl VirtualFs {
     pub fn get_root(&self) -> &Entry { &self.root }
 
     // @param path "path/to/somewhere" == ["path", "to", "somewhere"]
+    pub fn new_file_id(&mut self, find_id: &str, id: String, name: String, content: Vec<u8>) -> Result<&mut Entry, IOError> {
+        let Some(Entry::Folder { children, .. }) = self.root.find_mut(&find_id)? else {
+            return Err(IOError::NotAFolder { path: vec![find_id.to_string()] });
+        };
+
+        children.insert(
+            name.clone(), Entry::File { id, content }
+        );
+
+        Ok(children.get_mut(&name).unwrap())
+    }
+
+    // @param path "path/to/somewhere" == ["path", "to", "somewhere"]
+    pub fn new_folder_id(&mut self, find_id: &str, id: String, name: String) -> Result<&mut Entry, IOError> {
+        let Some(Entry::Folder { children, .. }) = self.root.find_mut(&find_id)? else {
+            return Err(IOError::NotAFolder { path: vec![find_id.to_string()] });
+        };
+
+        children.insert(
+            name.clone(),
+            Entry::Folder { id, children: Default::default() }
+        );
+
+        Ok(children.get_mut(&name).unwrap())
+    }
+
+
+    // @param path "path/to/somewhere" == ["path", "to", "somewhere"]
     pub fn new_file(&mut self, path: &[String], id: String, name: String, content: Vec<u8>) -> Result<&mut Entry, IOError> {
         let Entry::Folder { children, .. } = self.root.get_entry_mut(path, None)? else {
             return Err(IOError::NotAFolder { path: path.iter().map(ToString::to_string).collect() });

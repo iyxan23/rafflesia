@@ -115,11 +115,13 @@ pub fn Tree(props: &TreeProps) -> Html {
                 if let NodeKind::File { .. } = &node.kind { "file" } else { "folder" },
                 if *collapse { "collapsed" } else { "" }
             )}>
-            <div onclick={onclick} class={classes!("title", if let NodeKind::File { selected } = &node.kind {
+            <div class={classes!("title", if let NodeKind::File { selected } = &node.kind {
                 if *selected { "selected" }
                 else { "" }
             } else { "" })}>
-                {node.name.clone()} if let NodeKind::Folder { .. } = &node.kind { {"/"} }
+                <div class={classes!("text")} onclick={onclick}>
+                    {node.name.clone()} if let NodeKind::Folder { .. } = &node.kind { {"/"} }   
+                </div>
                 <div class={classes!("actions")}>
                     if let NodeKind::Folder { .. } = &node.kind { 
                         <button onclick={on_new_file_click}>{"New file"}</button>

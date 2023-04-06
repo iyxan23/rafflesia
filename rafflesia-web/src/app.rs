@@ -1,4 +1,4 @@
-use std::{ops::Deref, sync::Arc};
+use std::{ops::Deref, sync::Arc, cell::RefCell};
 
 use yew::prelude::*;
 use web_sys::window;
@@ -107,42 +107,42 @@ pub fn app() -> Html {
         on_node_click_selected_file.set(Some(id));
     });
 
+    let on_new_file_click_fs = fs.clone();
     let on_new_file_click = Callback::from(move |id: AttrValue| {
-        window().unwrap()
-            .alert_with_message(&format!("Creating a new file on: {}", id)).unwrap();
-    });
-    
-    let on_new_folder_click = Callback::from(move |id: AttrValue| {
-        window().unwrap()
-            .alert_with_message(&format!("Creating a new folder on: {}", id)).unwrap();
-    });
-
-    let new_file_click_fs = fs.clone();
-    let new_file_click = Callback::from(move |_| {
-        let Some(name) = bom_window
-            .prompt_with_message("Specify a filename:").unwrap() else {
-                bom_window.alert_with_message("You must specify a filename!").unwrap();
+        let window = window().unwrap();
+        let Some(name) = window
+            .prompt_with_message("Specify a name:").unwrap() else {
+                window.alert_with_message("A name is required!").unwrap();
                 return;
             };
 
-        let Some(path) = bom_window
-            .prompt_with_message("Specify a path:").unwrap() else {
-                bom_window.alert_with_message("You must specify a path!").unwrap();
-                return;
-            };
-        
-        // oh no
-        let mut modified = new_file_click_fs.deref().clone();
+        let mut modified = on_new_file_click_fs.deref().clone();
 
-        match modified.new_file(&path.split_terminator("/")
-            .map(ToString::to_string)
-            .collect::<Vec<_>>().as_slice(), path, name, vec![]
-        ) {
-            Ok(_) => bom_window.alert_with_message("Successful").unwrap(),
-            Err(err) => bom_window.alert_with_message(&format!("Failed: {:?}", err)).unwrap(),
+        match modified.new_file_id(id.as_str(), format!("{}/{}", id.as_str(), &name), name, vec![]) {
+            Ok(_) => window.alert_with_message("Successful").unwrap(),
+            Err(err) => window.alert_with_message(&format!("Failed: {:?}", err)).unwrap(),
         }
 
-        new_file_click_fs.set(modified);
+        on_new_file_click_fs.set(modified);
+    });
+    
+    let on_new_folder_click_fs = fs.clone();
+    let on_new_folder_click = Callback::from(move |id: AttrValue| {
+        let window = window().unwrap();
+        let Some(name) = window
+            .prompt_with_message("Specify a name:").unwrap() else {
+                window.alert_with_message("A name is required!").unwrap();
+                return;
+            };
+
+        let mut modified = on_new_folder_click_fs.deref().clone();
+
+        match modified.new_folder_id(id.as_str(), format!("{}/{}", id.as_str(), &name), name) {
+            Ok(_) => window.alert_with_message("Successful").unwrap(),
+            Err(err) => window.alert_with_message(&format!("Failed: {:?}", err)).unwrap(),
+        }
+
+        on_new_folder_click_fs.set(modified);
     });
 
     let selected_file_contents_fs = fs.clone();
@@ -164,28 +164,21 @@ pub fn app() -> Html {
 
     html! {
         <div class={classes!("parent")}>
-            <div class={classes!("top-part")}>
-                <div class={classes!("left-panel")}>
-                    <div class={classes!("header")}>
-                        <button onclick={new_file_click}>{"New file"}</button>
-                    </div>
-                    <Tree
-                        click={on_node_click}
-                        new_file_click={on_new_file_click}
-                        new_folder_click={on_new_folder_click}
-                        root_node={root_node.deref().clone()} />
-                </div>
-                <div class={classes!("code")}>
-                    <div class={classes!("filename")}>
-                        if let Some(name) = &*selected_file.clone() {
-                            {name}
-                        } else { {"No file selected"} }
-                    </div>
-                    <textarea value={selected_file_contents.deref().clone()}></textarea>
-                </div>
+            <div class={classes!("left-panel")}>
+                <div class={classes!("header")}></div>
+                <Tree
+                    click={on_node_click}
+                    new_file_click={on_new_file_click}
+                    new_folder_click={on_new_folder_click}
+                    root_node={root_node.deref().clone()} />
             </div>
-            <div class={classes!("under")}>
-                {"Hello under"}
+            <div class={classes!("code")}>
+                <div class={classes!("filename")}>
+                    if let Some(name) = &*selected_file.clone() {
+                        {name}
+                    } else { {"No file selected"} }
+                </div>
+                <textarea value={selected_file_contents.deref().clone()}></textarea>
             </div>
         </div>
     }
