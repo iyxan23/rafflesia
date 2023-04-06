@@ -1,17 +1,89 @@
-use std::ops::Deref;
+use std::{ops::Deref, sync::Arc};
 
 use yew::prelude::*;
 use web_sys::window;
 
-use crate::{tree::Tree, template::{virtfs_as_node, self}, virtfs::Entry};
+use crate::{tree::{Tree, Node}, template::{virtfs_as_node, self}, virtfs::{Entry, VirtualFs}};
 
-// Yew.rs feels like I can just throw any terribly unoptimized code at it
-// and make it seem like nothing. I don't know if doing this is a bad thing
-// there doesn't seem to be any other way of doing this.
+// pub struct AppStruct {
+//     fs: VirtualFs,
+//     root_node: Arc<Node>,
+
+//     selected_id: Option<AttrValue>,
+//     selected_file: Option<AttrValue>,
+//     selected_file_contents: Option<AttrValue>,
+
+//     file_field_open: bool,
+// }
+
+// pub enum AppMessage {
+//     EntryClick { id: AttrValue },
+//     NewFileClick,
+// }
+
+// impl Component for AppStruct {
+//     type Message = AppMessage;
+
+//     type Properties = ();
+
+//     fn create(ctx: &Context<Self>) -> Self {
+//         Self {
+//             fs: template::default(),
+//             root_node: todo!(),
+//             selected_id: todo!(),
+//             selected_file: todo!(),
+//             selected_file_contents: todo!(),
+//             file_field_open: todo!(),
+//         }
+//     }
+
+//     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
+//         match msg {
+//             AppMessage::EntryClick { id } => {
+
+//             },
+//             AppMessage::NewFileClick => {
+
+//             },
+//         }
+
+//         true
+//     }
+
+//     fn view(&self, ctx: &Context<Self>) -> Html {
+//         html! {
+//             <div class={classes!("parent")}>
+//                 <div class={classes!("top-part")}>
+//                     <div class={classes!("left-panel")}>
+//                         <div class={classes!("header")}>
+//                             <button onclick={ctx.link().callback(|_| AppMessage::NewFileClick)}>{"New file"}</button>
+//                         </div>
+//                         <Tree
+//                             new_file_click={||}
+//                             new_folder_click={}
+//                             click={ctx.link().callback(|id| AppMessage::EntryClick { id  })}
+//                             root_node={self.root_node.clone()} />
+//                     </div>
+//                     <div class={classes!("code")}>
+//                         <div class={classes!("filename")}>
+//                             if let Some(name) = &self.selected_file {
+//                                 {name}
+//                             } else { {"No file selected"} }
+//                         </div>
+//                         <textarea value={self.selected_file_contents.clone()}></textarea>
+//                     </div>
+//                 </div>
+//                 <div class={classes!("under")}>
+//                     {"Hello under"}
+//                 </div>
+//             </div>
+//         }
+//     }
+// }
 
 #[function_component(App)]
 pub fn app() -> Html {
-    let window = window().unwrap();
+    let bom_window = window().unwrap();
     let fs = use_state(|| template::default());
     let fs_selected_id = use_state(|| None::<String>);
 
@@ -35,18 +107,27 @@ pub fn app() -> Html {
         on_node_click_selected_file.set(Some(id));
     });
 
+    let on_new_file_click = Callback::from(move |id: AttrValue| {
+        window().unwrap()
+            .alert_with_message(&format!("Creating a new file on: {}", id)).unwrap();
+    });
+    
+    let on_new_folder_click = Callback::from(move |id: AttrValue| {
+        window().unwrap()
+            .alert_with_message(&format!("Creating a new folder on: {}", id)).unwrap();
+    });
 
     let new_file_click_fs = fs.clone();
     let new_file_click = Callback::from(move |_| {
-        let Some(name) = window
+        let Some(name) = bom_window
             .prompt_with_message("Specify a filename:").unwrap() else {
-                window.alert_with_message("You must specify a filename!").unwrap();
+                bom_window.alert_with_message("You must specify a filename!").unwrap();
                 return;
             };
 
-        let Some(path) = window
+        let Some(path) = bom_window
             .prompt_with_message("Specify a path:").unwrap() else {
-                window.alert_with_message("You must specify a path!").unwrap();
+                bom_window.alert_with_message("You must specify a path!").unwrap();
                 return;
             };
         
@@ -57,8 +138,8 @@ pub fn app() -> Html {
             .map(ToString::to_string)
             .collect::<Vec<_>>().as_slice(), path, name, vec![]
         ) {
-            Ok(_) => window.alert_with_message("Successful").unwrap(),
-            Err(err) => window.alert_with_message(&format!("Failed: {:?}", err)).unwrap(),
+            Ok(_) => bom_window.alert_with_message("Successful").unwrap(),
+            Err(err) => bom_window.alert_with_message(&format!("Failed: {:?}", err)).unwrap(),
         }
 
         new_file_click_fs.set(modified);
@@ -88,7 +169,11 @@ pub fn app() -> Html {
                     <div class={classes!("header")}>
                         <button onclick={new_file_click}>{"New file"}</button>
                     </div>
-                    <Tree click={on_node_click} root_node={root_node.deref().clone()} />
+                    <Tree
+                        click={on_node_click}
+                        new_file_click={on_new_file_click}
+                        new_folder_click={on_new_folder_click}
+                        root_node={root_node.deref().clone()} />
                 </div>
                 <div class={classes!("code")}>
                     <div class={classes!("filename")}>

@@ -11,6 +11,12 @@ yew = { version = "0.20", features = ["csr"] }
 wasm-bindgen = "0.2"
 unindent = "0.2.1"
 
+# gass rafflesia
+rafflesia = { path = "../rafflesia" }
+
+# swrs depends on `getrandom` but we need to manually enable its `js` feature flag
+getrandom = { version = "0.2", features = ["js"] }
+
 [dependencies.web-sys]
 version = "0.3"
-features = ["console"]
+features = ["console", "Event"]
