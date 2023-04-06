@@ -1,7 +1,8 @@
 use std::{ops::Deref, sync::Arc, cell::RefCell};
 
+use wasm_bindgen::JsCast;
 use yew::prelude::*;
-use web_sys::window;
+use web_sys::{window, EventTarget, HtmlTextAreaElement};
 
 use crate::{tree::{Tree, Node}, template::{virtfs_as_node, self}, virtfs::{Entry, VirtualFs}};
 
@@ -162,6 +163,27 @@ pub fn app() -> Html {
         selected_file.clone()
     );
 
+    let on_code_change_fs = fs.clone();
+    let on_code_change_selected_file = selected_file.clone();
+    let on_code_change = Callback::from(move |event: Event| {
+        let Some(selected_file) = &on_code_change_selected_file.deref() else { return; };
+
+        let target: EventTarget = event
+            .target()
+            .expect("Event should have a target when dispatched");
+
+        // update the filesystem's file content
+        let mut modified = on_code_change_fs.deref().clone();
+        let Entry::File { content, .. } = modified.find_entry_mut(selected_file.as_str()).unwrap().unwrap() else { return; };
+
+        let value = target.unchecked_into::<HtmlTextAreaElement>().value();
+
+        content.clear();
+        content.append(&mut value.into_bytes());
+
+        on_code_change_fs.set(modified);
+    });
+
     html! {
         <div class={classes!("parent")}>
             <div class={classes!("left-panel")}>
@@ -178,7 +200,7 @@ pub fn app() -> Html {
                         {name}
                     } else { {"No file selected"} }
                 </div>
-                <textarea value={selected_file_contents.deref().clone()}></textarea>
+                <textarea onchange={on_code_change} value={selected_file_contents.deref().clone()}></textarea>
             </div>
         </div>
     }
