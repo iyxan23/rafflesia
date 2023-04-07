@@ -6,7 +6,7 @@
 //!    The default rafflesia template, contains files to get started with
 //!    rafflesia.
 
-use std::sync::Arc;
+use std::rc::Rc;
 
 use crate::{virtfs::{VirtualFs, Entry}, tree::Node};
 
@@ -82,16 +82,16 @@ pub fn default() -> VirtualFs {
     vfs
 }
 
-pub fn virtfs_as_node(root_name: &str, virtfs: &VirtualFs, selected_id: &str) -> Arc<Node> {
+pub fn virtfs_as_node(root_name: &str, virtfs: &VirtualFs, selected_id: &str) -> Rc<Node> {
     virtfs_entry_as_node(root_name, virtfs.get_root(), selected_id)
 }
 
-pub fn virtfs_entry_as_node(name: &str, entry: &Entry, selected_id: &str) -> Arc<Node> {
+pub fn virtfs_entry_as_node(name: &str, entry: &Entry, selected_id: &str) -> Rc<Node> {
     match entry {
         Entry::File { id, .. } =>
-            Arc::new(Node::new_file(id, name, selected_id == id)),
+            Rc::new(Node::new_file(id, name, selected_id == id)),
         Entry::Folder { id, children } =>
-            Arc::new(Node::new_folder(
+            Rc::new(Node::new_folder(
                 id, name,
                 children.iter()
                     .map(|(name, entry)|

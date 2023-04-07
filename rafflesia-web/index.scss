@@ -69,14 +69,17 @@ body {
   .children {
     margin-left: 1rem;
   }
-  
-  .title.selected {
+
+  &.selected .title {
     font-weight: bold;
   }
   
   .title {
     display: flex;
     z-index: 5;
+
+    padding-top: .1rem;
+    padding-bottom: .1rem;
     
     .text {
       flex-grow: 1;

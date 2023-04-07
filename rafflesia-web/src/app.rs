@@ -1,207 +1,192 @@
-use std::{ops::Deref, sync::Arc, cell::RefCell};
+use std::rc::Rc;
 
 use wasm_bindgen::JsCast;
-use yew::prelude::*;
 use web_sys::{window, EventTarget, HtmlTextAreaElement};
+use yew::prelude::*;
 
 use crate::{tree::{Tree, Node}, template::{virtfs_as_node, self}, virtfs::{Entry, VirtualFs}};
 
-// pub struct AppStruct {
-//     fs: VirtualFs,
-//     root_node: Arc<Node>,
+pub struct App {
+    fs: VirtualFs,
+    root_node: Rc<Node>,
 
-//     selected_id: Option<AttrValue>,
-//     selected_file: Option<AttrValue>,
-//     selected_file_contents: Option<AttrValue>,
+    selected_id: Option<AttrValue>,
+    selected_file_contents: AttrValue,
+}
 
-//     file_field_open: bool,
-// }
+impl App {
+    fn recreate_nodes(&mut self, selected_id: Option<&str>) {
+        // fixme: unnecessary allocation
+        let empty_string = AttrValue::from(String::new());
 
-// pub enum AppMessage {
-//     EntryClick { id: AttrValue },
-//     NewFileClick,
-// }
+        self.root_node = virtfs_as_node(
+            "rafflesia-project",
+            &self.fs,
+            selected_id.unwrap_or_else(||
+                self.selected_id
+                    .as_ref()
+                    .unwrap_or(&empty_string)
+            )
+        );
+    }
+}
 
-// impl Component for AppStruct {
-//     type Message = AppMessage;
+#[derive(Debug, Clone)]
+pub enum AppMessage {
+    EntryClick { id: AttrValue },
+    NewFileClick { folder: AttrValue },
+    NewFolderClick { folder: AttrValue },
+    ContentChange { event: Event }
+}
 
-//     type Properties = ();
+impl Component for App {
+    type Message = AppMessage;
 
-//     fn create(ctx: &Context<Self>) -> Self {
-//         Self {
-//             fs: template::default(),
-//             root_node: todo!(),
-//             selected_id: todo!(),
-//             selected_file: todo!(),
-//             selected_file_contents: todo!(),
-//             file_field_open: todo!(),
-//         }
-//     }
+    type Properties = ();
 
-//     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
-//         match msg {
-//             AppMessage::EntryClick { id } => {
+    fn create(_ctx: &Context<Self>) -> Self {
+        let template = template::default();
+        Self {
+            root_node: virtfs_as_node("rafflesia-project", &template, ""),
+            fs: template,
 
-//             },
-//             AppMessage::NewFileClick => {
+            selected_id: None,
+            selected_file_contents: AttrValue::from(String::from(
+                r#"
+   __        __   _                            _        
+   \ \      / /__| | ___ ___  _ __ ___   ___  | |_ ___  
+    \ \ /\ / / _ \ |/ __/ _ \| '_ ` _ \ / _ \ | __/ _ \ 
+     \ V  V /  __/ | (_| (_) | | | | | |  __/ | || (_) |
+      \_/\_/ \___|_|\___\___/|_| |_| |_|\___|  \__\___/ 
+                                                     
+ ____        __  __ _           _        __        __   _     
+|  _ \ __ _ / _|/ _| | ___  ___(_) __ _  \ \      / /__| |__  
+| |_) / _` | |_| |_| |/ _ \/ __| |/ _` |  \ \ /\ / / _ \ '_ \ 
+|  _ < (_| |  _|  _| |  __/\__ \ | (_| |   \ V  V /  __/ |_) |
+|_| \_\__,_|_| |_| |_|\___||___/_|\__,_|    \_/\_/ \___|_.__/ 
 
-//             },
-//         }
+                        ---==+==---
 
-//         true
-//     }
+    Welcome to Rafflesia Web! Explore the capabilities of
+    my hobby lang, Rafflesia. Simply write code and
+    compile them into Sketchware projects directly in your
+    browser!
 
-//     fn view(&self, ctx: &Context<Self>) -> Html {
-//         html! {
-//             <div class={classes!("parent")}>
-//                 <div class={classes!("top-part")}>
-//                     <div class={classes!("left-panel")}>
-//                         <div class={classes!("header")}>
-//                             <button onclick={ctx.link().callback(|_| AppMessage::NewFileClick)}>{"New file"}</button>
-//                         </div>
-//                         <Tree
-//                             new_file_click={||}
-//                             new_folder_click={}
-//                             click={ctx.link().callback(|id| AppMessage::EntryClick { id  })}
-//                             root_node={self.root_node.clone()} />
-//                     </div>
-//                     <div class={classes!("code")}>
-//                         <div class={classes!("filename")}>
-//                             if let Some(name) = &self.selected_file {
-//                                 {name}
-//                             } else { {"No file selected"} }
-//                         </div>
-//                         <textarea value={self.selected_file_contents.clone()}></textarea>
-//                     </div>
-//                 </div>
-//                 <div class={classes!("under")}>
-//                     {"Hello under"}
-//                 </div>
-//             </div>
-//         }
-//     }
-// }
+    Try out the examples and see what Rafflesia can do
+    for you. Join our community and let's build something
+    great together!
 
-#[function_component(App)]
-pub fn app() -> Html {
-    let bom_window = window().unwrap();
-    let fs = use_state(|| template::default());
-    let fs_selected_id = use_state(|| None::<String>);
+    Powered by WebAssembly, Rust and Yew.rs.
 
-    // how to make `root_node` update as `fs` gets updated as well?
-    // does it already do that automatically?
-    let root_node =
-        use_memo(|(fs, fs_selected_id)| {
-            let empty_string = String::new();
-            let fs_selected_id = fs_selected_id.as_ref().unwrap_or(&empty_string);
-
-            virtfs_as_node("rafflesia-project", &fs, &fs_selected_id)
-        }, (fs.clone(), fs_selected_id.clone()));
-
-    let selected_file = use_state(|| None::<AttrValue>);
-
-    let on_node_click_selected_file = selected_file.clone();
-    let on_node_click_selected_id = fs_selected_id.clone();
-    let on_node_click = Callback::from(move |id: AttrValue| {
-        // oh no
-        on_node_click_selected_id.set(Some(id.to_string()));
-        on_node_click_selected_file.set(Some(id));
-    });
-
-    let on_new_file_click_fs = fs.clone();
-    let on_new_file_click = Callback::from(move |id: AttrValue| {
-        let window = window().unwrap();
-        let Some(name) = window
-            .prompt_with_message("Specify a name:").unwrap() else {
-                window.alert_with_message("A name is required!").unwrap();
-                return;
-            };
-
-        let mut modified = on_new_file_click_fs.deref().clone();
-
-        match modified.new_file_id(id.as_str(), format!("{}/{}", id.as_str(), &name), name, vec![]) {
-            Ok(_) => window.alert_with_message("Successful").unwrap(),
-            Err(err) => window.alert_with_message(&format!("Failed: {:?}", err)).unwrap(),
+    - Iyxan :>"#)),
         }
+    }
 
-        on_new_file_click_fs.set(modified);
-    });
-    
-    let on_new_folder_click_fs = fs.clone();
-    let on_new_folder_click = Callback::from(move |id: AttrValue| {
+    fn update(&mut self, _ctx: &Context<Self>, msg: Self::Message) -> bool {
         let window = window().unwrap();
-        let Some(name) = window
-            .prompt_with_message("Specify a name:").unwrap() else {
-                window.alert_with_message("A name is required!").unwrap();
-                return;
-            };
+        match msg {
+            AppMessage::EntryClick { id } => {
+                // set contents to that file
+                let Entry::File { content, .. } = 
+                    self.fs.find_entry(id.as_str())
+                        .unwrap().unwrap() else { return false; };
 
-        let mut modified = on_new_folder_click_fs.deref().clone();
+                self.selected_file_contents = AttrValue::from(String::from_utf8(content.clone()).unwrap());
 
-        match modified.new_folder_id(id.as_str(), format!("{}/{}", id.as_str(), &name), name) {
-            Ok(_) => window.alert_with_message("Successful").unwrap(),
-            Err(err) => window.alert_with_message(&format!("Failed: {:?}", err)).unwrap(),
+                // recreate the nodes
+                self.recreate_nodes(Some(id.as_str()));
+
+                // open file
+                self.selected_id = Some(id);
+
+                return true;
+            },
+            AppMessage::NewFileClick { folder } => {
+                // new file
+                let Some(name) = window
+                    .prompt_with_message("Specify a name:").unwrap() else {
+                        window.alert_with_message("A name is required!").unwrap();
+                        return false;
+                    };
+                
+                self.fs.new_file_id(
+                    folder.as_str(),
+                    format!("{}/{}", folder, name),
+                    name,
+                    vec![]
+                ).unwrap();
+
+                self.recreate_nodes(None);
+
+                return true;
+            },
+            AppMessage::NewFolderClick { folder } => {
+                // new folder
+                let Some(name) = window
+                    .prompt_with_message("Specify a name:").unwrap() else {
+                        window.alert_with_message("A name is required!").unwrap();
+                        return false;
+                    };
+                
+                self.fs.new_folder_id(
+                    folder.as_str(),
+                    format!("{}/{}", folder, name),
+                    name,
+                ).unwrap();
+
+                self.recreate_nodes(None);
+
+                return true;
+            },
+            AppMessage::ContentChange { event } => {
+                let Some(selected_id) = &self.selected_id else { return false; };
+
+                // when the user changed something in the code editor 
+                let target: EventTarget = event.target().unwrap();
+
+                // update the filesystem's file content
+                let Entry::File { content, .. }
+                    = self.fs.find_entry_mut(selected_id.as_str()).unwrap().unwrap() else {
+                        return false;
+                    };
+
+                let value = target.unchecked_into::<HtmlTextAreaElement>().value();
+
+                content.clear();
+                content.append(&mut value.into_bytes());
+
+                self.selected_file_contents = AttrValue::from(String::from_utf8(content.clone()).unwrap());
+
+                return true;
+            }
         }
+    }
 
-        on_new_folder_click_fs.set(modified);
-    });
-
-    let selected_file_contents_fs = fs.clone();
-    let selected_file_contents = use_memo(
-        |sf| if let Some(sf) = sf.deref() {
-            // the filename
-            let s = selected_file_contents_fs.clone();
-            let Entry::File { content, .. } =
-                    s.find_entry(sf)
-                    .unwrap().unwrap()
-                    else { unreachable!() };
-
-            Some(AttrValue::from(
-                String::from_utf8(content.to_vec()).expect("not utf8")
-            ))
-        } else { None },
-        selected_file.clone()
-    );
-
-    let on_code_change_fs = fs.clone();
-    let on_code_change_selected_file = selected_file.clone();
-    let on_code_change = Callback::from(move |event: Event| {
-        let Some(selected_file) = &on_code_change_selected_file.deref() else { return; };
-
-        let target: EventTarget = event
-            .target()
-            .expect("Event should have a target when dispatched");
-
-        // update the filesystem's file content
-        let mut modified = on_code_change_fs.deref().clone();
-        let Entry::File { content, .. } = modified.find_entry_mut(selected_file.as_str()).unwrap().unwrap() else { return; };
-
-        let value = target.unchecked_into::<HtmlTextAreaElement>().value();
-
-        content.clear();
-        content.append(&mut value.into_bytes());
-
-        on_code_change_fs.set(modified);
-    });
-
-    html! {
-        <div class={classes!("parent")}>
-            <div class={classes!("left-panel")}>
-                <div class={classes!("header")}></div>
-                <Tree
-                    click={on_node_click}
-                    new_file_click={on_new_file_click}
-                    new_folder_click={on_new_folder_click}
-                    root_node={root_node.deref().clone()} />
-            </div>
-            <div class={classes!("code")}>
-                <div class={classes!("filename")}>
-                    if let Some(name) = &*selected_file.clone() {
-                        {name}
-                    } else { {"No file selected"} }
+    fn view(&self, ctx: &Context<Self>) -> Html {
+        html! {
+            <div class={classes!("parent")}>
+                <div class={classes!("left-panel")}>
+                    <div class={classes!("header")}></div>
+                    <Tree
+                        click={ctx.link().callback(|id| AppMessage::EntryClick { id })}
+                        new_file_click={ctx.link().callback(|folder| AppMessage::NewFileClick { folder })}
+                        new_folder_click={ctx.link().callback(|folder| AppMessage::NewFolderClick { folder })}
+                        root_node={Rc::clone(&self.root_node)} />
                 </div>
-                <textarea onchange={on_code_change} value={selected_file_contents.deref().clone()}></textarea>
+                <div class={classes!("code")}>
+                    <div class={classes!("filename")}>
+                        if let Some(name) = &self.selected_id {
+                            {name}
+                        } else { {"No file selected"} }
+                    </div>
+                    <textarea
+                        wrap={"off"}
+                        onchange={ctx.link().callback(|event| AppMessage::ContentChange { event })}
+                        value={&self.selected_file_contents}
+                        disabled={self.selected_id.is_none()} >
+                    </textarea>
+                </div>
             </div>
-        </div>
+        }
     }
 }

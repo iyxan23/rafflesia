@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::rc::Rc;
 
 use web_sys::MouseEvent;
 use yew::{Properties, function_component, html, Html, classes, AttrValue, Callback, use_state};
@@ -6,7 +6,7 @@ use yew::{Properties, function_component, html, Html, classes, AttrValue, Callba
 #[derive(Debug, Clone, PartialEq)]
 pub enum NodeKind {
     Folder {
-        children: Vec<Arc<Node>>
+        children: Vec<Rc<Node>>
     },
     File {
         selected: bool
@@ -29,7 +29,7 @@ impl Node {
         }
     }
 
-    pub fn new_folder(id: &str, name: &str, children: Vec<Arc<Self>>) -> Self {
+    pub fn new_folder(id: &str, name: &str, children: Vec<Rc<Self>>) -> Self {
         Node {
             id: id.to_string().into(),
             name: name.to_string().into(),
@@ -40,7 +40,7 @@ impl Node {
 
 #[derive(Properties, PartialEq)]
 pub struct TreeProps {
-    pub root_node: Arc<Node>,
+    pub root_node: Rc<Node>,
     pub click: Callback<AttrValue, ()>,
 
     // these callbacks gives the ID of the node
@@ -54,9 +54,9 @@ pub fn Tree(props: &TreeProps) -> Html {
     let node = &props.root_node;
 
     // at this point i'm just bruteforcing how to solve this issue
-    let click = Arc::new(props.click.clone());
-    let new_file_click = Arc::new(props.new_file_click.clone());
-    let new_folder_click = Arc::new(props.new_folder_click.clone());
+    let click = Rc::new(props.click.clone());
+    let new_file_click = Rc::new(props.new_file_click.clone());
+    let new_folder_click = Rc::new(props.new_folder_click.clone());
     
     let onclick_id = node.id.clone();
     let onclick = if let NodeKind::File { .. } = &node.kind {
@@ -112,13 +112,12 @@ pub fn Tree(props: &TreeProps) -> Html {
     html! {
         <div class={classes!(
                 "node",
-                if let NodeKind::File { .. } = &node.kind { "file" } else { "folder" },
+                if let NodeKind::File { selected } = &node.kind {
+                    if *selected { "file selected" } else { "file" }
+                } else { "folder" },
                 if *collapse { "collapsed" } else { "" }
             )}>
-            <div class={classes!("title", if let NodeKind::File { selected } = &node.kind {
-                if *selected { "selected" }
-                else { "" }
-            } else { "" })}>
+            <div class={classes!("title")}>
                 <div class={classes!("text")} onclick={onclick}>
                     {node.name.clone()} if let NodeKind::Folder { .. } = &node.kind { {"/"} }   
                 </div>
