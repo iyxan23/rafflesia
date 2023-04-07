@@ -1,10 +1,17 @@
+mod tree;
+mod template;
+mod virtfs;
+pub mod compiler_worker;
+
 use std::rc::Rc;
 
+use compiler_worker::{CompilerWorker, CompilerWorkerOutput};
 use wasm_bindgen::JsCast;
 use web_sys::{window, EventTarget, HtmlTextAreaElement, HtmlSelectElement};
 use yew::prelude::*;
+use yew_agent::{Bridge, Bridged};
 
-use crate::{tree::{Tree, Node}, template::{virtfs_as_node, self}, virtfs::{Entry, VirtualFs}};
+use crate::{tree::{Tree, Node}, template::{virtfs_as_node}, virtfs::{Entry, VirtualFs}};
 
 const WELCOME_MESSAGE: &str = r#"
    __        __   _                            _        
@@ -42,6 +49,8 @@ pub struct App {
     selected_file_contents: AttrValue,
 
     selected_template: usize,
+
+    compiler_worker: Box<dyn Bridge<CompilerWorker>>
 }
 
 impl App {
@@ -69,6 +78,8 @@ pub enum AppMessage {
     ContentChange { event: Event },
     
     ChangeTemplate { event: Event },
+
+    CompilerMsg(CompilerWorkerOutput)
 }
 
 impl Component for App {
@@ -76,13 +87,21 @@ impl Component for App {
 
     type Properties = ();
 
-    fn create(_ctx: &Context<Self>) -> Self {
+    fn create(ctx: &Context<Self>) -> Self {
         let (_name, template) = template::TEMPLATES
             .get(template::DEFAULT_TEMPLATE)
             .expect("given DEFAULT_TEMPLATE doesn't exists in defined templates");
 
         // invoke the function
         let template = template();
+
+        // compiler worker initialisation
+        let cb = {
+            let link = ctx.link().clone();
+            move |e| link.send_message(Self::Message::CompilerMsg(e))
+        };
+
+        let worker = CompilerWorker::bridge(Rc::new(cb));
 
         Self {
             root_node: virtfs_as_node("rafflesia-project", &template, ""),
@@ -92,6 +111,7 @@ impl Component for App {
 
             selected_id: None,
             selected_file_contents: AttrValue::from(WELCOME_MESSAGE),
+            compiler_worker: worker,
         }
     }
 
@@ -180,7 +200,7 @@ impl Component for App {
                 self.selected_template = element.selected_index() as usize;
 
                 // completely change the fs 
-                let (name, template) = template::TEMPLATES
+                let (_name, template) = template::TEMPLATES
                     .get(self.selected_template)
                     .unwrap();
 
@@ -190,10 +210,9 @@ impl Component for App {
                 self.selected_file_contents = AttrValue::from(WELCOME_MESSAGE);
                 self.recreate_nodes(None);
 
-                web_sys::console::log_1(&wasm_bindgen::JsValue::from(format!("selected option: {}, name: {}", self.selected_template, name)));
-
                 return true;
             }
+            AppMessage::CompilerMsg(_) => todo!(),
         }
     }
 
