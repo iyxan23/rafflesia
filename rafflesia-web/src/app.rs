@@ -1,58 +1,12 @@
 use std::rc::Rc;
 
 use wasm_bindgen::JsCast;
-use web_sys::{window, EventTarget, HtmlTextAreaElement};
+use web_sys::{window, EventTarget, HtmlTextAreaElement, HtmlSelectElement};
 use yew::prelude::*;
 
 use crate::{tree::{Tree, Node}, template::{virtfs_as_node, self}, virtfs::{Entry, VirtualFs}};
 
-pub struct App {
-    fs: VirtualFs,
-    root_node: Rc<Node>,
-
-    selected_id: Option<AttrValue>,
-    selected_file_contents: AttrValue,
-}
-
-impl App {
-    fn recreate_nodes(&mut self, selected_id: Option<&str>) {
-        // fixme: unnecessary allocation
-        let empty_string = AttrValue::from(String::new());
-
-        self.root_node = virtfs_as_node(
-            "rafflesia-project",
-            &self.fs,
-            selected_id.unwrap_or_else(||
-                self.selected_id
-                    .as_ref()
-                    .unwrap_or(&empty_string)
-            )
-        );
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum AppMessage {
-    EntryClick { id: AttrValue },
-    NewFileClick { folder: AttrValue },
-    NewFolderClick { folder: AttrValue },
-    ContentChange { event: Event }
-}
-
-impl Component for App {
-    type Message = AppMessage;
-
-    type Properties = ();
-
-    fn create(_ctx: &Context<Self>) -> Self {
-        let template = template::default();
-        Self {
-            root_node: virtfs_as_node("rafflesia-project", &template, ""),
-            fs: template,
-
-            selected_id: None,
-            selected_file_contents: AttrValue::from(String::from(
-                r#"
+const WELCOME_MESSAGE: &str = r#"
    __        __   _                            _        
    \ \      / /__| | ___ ___  _ __ ___   ___  | |_ ___  
     \ \ /\ / / _ \ |/ __/ _ \| '_ ` _ \ / _ \ | __/ _ \ 
@@ -78,7 +32,66 @@ impl Component for App {
 
     Powered by WebAssembly, Rust and Yew.rs.
 
-    - Iyxan :>"#)),
+    - Iyxan :>"#;
+
+pub struct App {
+    fs: VirtualFs,
+    root_node: Rc<Node>,
+
+    selected_id: Option<AttrValue>,
+    selected_file_contents: AttrValue,
+
+    selected_template: usize,
+}
+
+impl App {
+    fn recreate_nodes(&mut self, selected_id: Option<&str>) {
+        // fixme: unnecessary allocation
+        let empty_string = AttrValue::from(String::new());
+
+        self.root_node = virtfs_as_node(
+            "rafflesia-project",
+            &self.fs,
+            selected_id.unwrap_or_else(||
+                self.selected_id
+                    .as_ref()
+                    .unwrap_or(&empty_string)
+            )
+        );
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum AppMessage {
+    EntryClick { id: AttrValue },
+    NewFileClick { folder: AttrValue },
+    NewFolderClick { folder: AttrValue },
+    ContentChange { event: Event },
+    
+    ChangeTemplate { event: Event },
+}
+
+impl Component for App {
+    type Message = AppMessage;
+
+    type Properties = ();
+
+    fn create(_ctx: &Context<Self>) -> Self {
+        let (_name, template) = template::TEMPLATES
+            .get(template::DEFAULT_TEMPLATE)
+            .expect("given DEFAULT_TEMPLATE doesn't exists in defined templates");
+
+        // invoke the function
+        let template = template();
+
+        Self {
+            root_node: virtfs_as_node("rafflesia-project", &template, ""),
+            fs: template,
+
+            selected_template: template::DEFAULT_TEMPLATE,
+
+            selected_id: None,
+            selected_file_contents: AttrValue::from(WELCOME_MESSAGE),
         }
     }
 
@@ -158,15 +171,56 @@ impl Component for App {
                 self.selected_file_contents = AttrValue::from(String::from_utf8(content.clone()).unwrap());
 
                 return true;
+            },
+            AppMessage::ChangeTemplate { event } => {
+                // get the selected element and retrieve which's selected
+                let element = event.target().unwrap()
+                    .unchecked_into::<HtmlSelectElement>();
+
+                self.selected_template = element.selected_index() as usize;
+
+                // completely change the fs 
+                let (name, template) = template::TEMPLATES
+                    .get(self.selected_template)
+                    .unwrap();
+
+                // reset every values
+                self.fs = template();
+                self.selected_id = None;
+                self.selected_file_contents = AttrValue::from(WELCOME_MESSAGE);
+                self.recreate_nodes(None);
+
+                web_sys::console::log_1(&wasm_bindgen::JsValue::from(format!("selected option: {}, name: {}", self.selected_template, name)));
+
+                return true;
             }
         }
     }
 
     fn view(&self, ctx: &Context<Self>) -> Html {
+        // templates
+        let templates = template::TEMPLATES.into_iter()
+            .enumerate()
+            .map(|(idx, (name, _func))| {
+                let name = AttrValue::from(name);
+                html! {
+                    <option
+                        selected={idx == self.selected_template}
+                        key={name.as_str()}
+                        value={name.clone()}>{name}</option>
+                }
+            });
+
         html! {
             <div class={classes!("parent")}>
                 <div class={classes!("left-panel")}>
-                    <div class={classes!("header")}></div>
+                    <div class={classes!("header")}>
+                        {"Select a template: "}
+                        <select
+                            onchange={ctx.link().callback(|event| AppMessage::ChangeTemplate { event })}>
+                            { for templates }
+                        </select>
+                    </div>
                     <Tree
                         click={ctx.link().callback(|id| AppMessage::EntryClick { id })}
                         new_file_click={ctx.link().callback(|folder| AppMessage::NewFileClick { folder })}

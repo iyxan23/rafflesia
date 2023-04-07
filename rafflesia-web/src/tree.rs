@@ -96,15 +96,16 @@ pub fn Tree(props: &TreeProps) -> Html {
     let contents = if let NodeKind::Folder { children } = &node.kind {
         html! {
             <div class={classes!("children")}>
-                {children
+                {for children
                     .iter()
                     .map(|child| html! {
                         <Tree
+                            key={child.id.as_str()}
                             click={props.click.clone()}
                             new_file_click={props.new_file_click.clone()}
                             new_folder_click={props.new_folder_click.clone()}
                             root_node={child.clone()} />
-                    }).collect::<Html>()}
+                    })}
             </div>
         }
     } else { html! {} };

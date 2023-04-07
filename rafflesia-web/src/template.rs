@@ -10,6 +10,13 @@ use std::rc::Rc;
 
 use crate::{virtfs::{VirtualFs, Entry}, tree::Node};
 
+pub const TEMPLATES: [(&str, fn() -> VirtualFs); 2] = [
+    ("Simple toast", default),
+    ("Test template", test_template),
+];
+
+pub const DEFAULT_TEMPLATE: usize = 0;
+
 pub fn default() -> VirtualFs {
     let vfs = VirtualFs::new(
         Entry::new_folder(
@@ -77,6 +84,22 @@ pub fn default() -> VirtualFs {
                 ).unwrap()
         )
         .unwrap()
+    );
+
+    vfs
+}
+
+pub fn test_template() -> VirtualFs {
+    let vfs = VirtualFs::new(
+        Entry::new_folder(
+            String::from("root"),
+        ).put_entry(
+            String::from("what is this file"),
+            Entry::new_file(
+                String::from("what is this file"),
+                unindent::unindent(r#"alskdhalsdhkd"#).into_bytes()
+            )
+        ).unwrap()
     );
 
     vfs
