@@ -39,7 +39,7 @@ jobs:
         uses: jetli/trunk-action@v0.4.0
 
       - name: Build with trunk
-        run: cd rafflesia-web && trunk build
+        run: cd rafflesia-web && trunk build --public-url rafflesia/ --release
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v1
