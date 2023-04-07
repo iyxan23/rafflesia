@@ -22,16 +22,19 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-        
+
+      - name: Update submodules
+        uses: snickerbockers/submodules-init@v4
+
       - name: Setup Pages
         uses: actions/configure-pages@v3
-        
+
       - name: Setup Rust
         uses: ATiltedTree/setup-rust@v1.0.5
         with:
           rust-version: stable
           targets: wasm32-unknown-unknown
-      
+
       - name: Install trunk
         uses: jetli/trunk-action@v0.4.0
 
