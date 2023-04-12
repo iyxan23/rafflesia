@@ -24,6 +24,20 @@ body {
     display: flex;
     flex-direction: column;
     gap: .5rem;
+
+    .node {
+      flex-grow: 1;
+    }
+
+    .footer {
+      display: flex;
+      flex-direction: column;
+      gap: .5rem;
+
+      button {
+        padding: .5rem;
+      }
+    }
   }
   
   .code {

@@ -14,17 +14,25 @@ unindent = "0.2.1"
 
 # gass rafflesia
 rafflesia = { path = "../rafflesia" }
+swrs = { path = "../swrs" }
 
 # swrs depends on `getrandom` but we need to manually enable its `js` feature flag
 getrandom = { version = "0.2", features = ["js"] }
 serde = "1"
 
 gloo-worker = "0.2.1"
+gloo-dialogs = "0.1.1"
+gloo-file = "0.2.3"
+
+zip = { version = "0.6.4", default-features = false, features = [  ]}
 
 [dependencies.web-sys]
 version = "0.3"
 features = [
     "console",
     "Event",
-    "HtmlSelectElement"
+    "HtmlElement",
+    "HtmlSelectElement",
+
+    "Document", "Element", "Url"
 ]

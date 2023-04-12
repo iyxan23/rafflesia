@@ -1,18 +1,33 @@
 use serde::{Deserialize, Serialize};
 use yew_agent::{HandlerId, Public, WorkerLink};
 
+use crate::{virtfs::VirtualFs, compiler};
+
 pub struct CompilerWorker {
     link: WorkerLink<Self>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CompilerWorkerInput {
-    pub n: u32,
+    pub fs: VirtualFs,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct CompilerWorkerOutput {
-    pub value: u32,
+pub enum CompilerWorkerOutput {
+    Success(ProjectData),
+    Failure,
+}
+
+// encrypted and ready-to-go
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ProjectData {
+    pub project: Vec<u8>,
+
+    pub file: Vec<u8>,
+    pub logic: Vec<u8>,
+    pub view: Vec<u8>,
+    pub resource: Vec<u8>,
+    pub library: Vec<u8>,
 }
 
 impl yew_agent::Worker for CompilerWorker {
@@ -30,23 +45,22 @@ impl yew_agent::Worker for CompilerWorker {
     }
 
     fn handle_input(&mut self, msg: Self::Input, id: HandlerId) {
-        // this runs in a web worker
-        // and does not block the main
-        // browser thread!
+        // resolve the swproj.toml file and parse it
+        // invoke the compiler module to do the actual compilation
 
-        let n = msg.n;
-
-        fn fib(n: u32) -> u32 {
-            if n <= 1 {
-                1
-            } else {
-                fib(n - 1) + fib(n - 2)
-            }
-        }
-
-        let output = Self::Output { value: fib(n) };
-
-        self.link.respond(id, output);
+        self.link.respond(id, compiler::compile(msg.fs)
+            .map(|raw| {
+                // todo: feature to upload and set resources
+                CompilerWorkerOutput::Success(ProjectData {
+                    project: swrs::encrypt_sw(raw.project.as_bytes()),
+                    file: swrs::encrypt_sw(raw.file.as_bytes()),
+                    logic: swrs::encrypt_sw(raw.logic.as_bytes()),
+                    view: swrs::encrypt_sw(raw.view.as_bytes()),
+                    resource: swrs::encrypt_sw(raw.resource.as_bytes()),
+                    library: swrs::encrypt_sw(raw.library.as_bytes()),
+                })
+            })
+            .unwrap_or(CompilerWorkerOutput::Failure));
     }
 
     fn name_of_resource() -> &'static str {

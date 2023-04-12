@@ -1,11 +1,14 @@
 mod tree;
 mod template;
 mod virtfs;
+mod compiler;
 pub mod compiler_worker;
 
-use std::rc::Rc;
+use std::{rc::Rc, io::Write};
 
-use compiler_worker::{CompilerWorker, CompilerWorkerOutput};
+use compiler_worker::{CompilerWorker, CompilerWorkerOutput, CompilerWorkerInput, ProjectData};
+use gloo_dialogs::alert;
+use gloo_file::{File, Blob};
 use wasm_bindgen::JsCast;
 use web_sys::{window, EventTarget, HtmlTextAreaElement, HtmlSelectElement};
 use yew::prelude::*;
@@ -50,7 +53,10 @@ pub struct App {
 
     selected_template: usize,
 
-    compiler_worker: Box<dyn Bridge<CompilerWorker>>
+    compiler_worker: Box<dyn Bridge<CompilerWorker>>,
+
+    compiling: bool, // true if we're compiling, will block all user input.
+    compiled: Option<ProjectData>,
 }
 
 impl App {
@@ -79,7 +85,10 @@ pub enum AppMessage {
     
     ChangeTemplate { event: Event },
 
-    CompilerMsg(CompilerWorkerOutput)
+    CompileFinished(CompilerWorkerOutput),
+
+    Compile,
+    DownloadProject,
 }
 
 impl Component for App {
@@ -98,7 +107,7 @@ impl Component for App {
         // compiler worker initialisation
         let cb = {
             let link = ctx.link().clone();
-            move |e| link.send_message(Self::Message::CompilerMsg(e))
+            move |e| link.send_message(Self::Message::CompileFinished(e))
         };
 
         let worker = CompilerWorker::bridge(Rc::new(cb));
@@ -112,6 +121,9 @@ impl Component for App {
             selected_id: None,
             selected_file_contents: AttrValue::from(WELCOME_MESSAGE),
             compiler_worker: worker,
+
+            compiling: false,
+            compiled: None
         }
     }
 
@@ -212,7 +224,67 @@ impl Component for App {
 
                 return true;
             }
-            AppMessage::CompilerMsg(_) => todo!(),
+            AppMessage::Compile => {
+                self.compiling = true;
+
+                self.compiler_worker.send(CompilerWorkerInput { fs: self.fs.clone() });
+
+                return true;
+            },
+            AppMessage::CompileFinished(response) => {
+                match response {
+                    CompilerWorkerOutput::Success(project_data) => {
+                        self.compiled = Some(project_data);
+                        self.compiling = false;
+
+                        return true;
+                    },
+                    CompilerWorkerOutput::Failure => {
+                        alert("Compilation failed, error propagation wip");
+
+                        return false;
+                    },
+                }
+            },
+            AppMessage::DownloadProject => {
+                let Some(project_data) = &self.compiled else { return false; };
+
+                // fixme: is it better to move the zipping onto the service worker than to block the main thread?
+                let buffer = [0; 1000000]; // 1MB buffer
+                let mut writer = zip::ZipWriter::new(std::io::Cursor::new(buffer));
+
+                writer.start_file("view", Default::default()).unwrap();
+                writer.write_all(project_data.view.as_slice()).unwrap();
+                writer.start_file("logic", Default::default()).unwrap();
+                writer.write_all(project_data.logic.as_slice()).unwrap();
+                writer.start_file("file", Default::default()).unwrap();
+                writer.write_all(project_data.file.as_slice()).unwrap();
+                writer.start_file("resource", Default::default()).unwrap();
+                writer.write_all(project_data.resource.as_slice()).unwrap();
+                writer.start_file("library", Default::default()).unwrap();
+                writer.write_all(project_data.library.as_slice()).unwrap();
+
+                writer.add_directory("project", Default::default()).unwrap();
+                writer.start_file("project", Default::default()).unwrap();
+                writer.write_all(project_data.project.as_slice()).unwrap();
+
+                let result = writer.finish().unwrap().into_inner();
+
+                let blob = Blob::new(result.as_slice());
+                let doc = web_sys::window().unwrap()
+                    .document().unwrap();
+                
+                let element = doc.create_element("a").unwrap()
+                    .dyn_into::<web_sys::HtmlElement>().unwrap();
+
+                element.set_attribute("href", web_sys::Url::create_object_url_with_blob(&blob.into()).unwrap().as_str()).unwrap();
+                element.set_attribute("download", "compiled-project.zip").unwrap();
+
+                // download it :>
+                element.click();
+
+                return false;
+            },
         }
     }
 
@@ -245,6 +317,20 @@ impl Component for App {
                         new_file_click={ctx.link().callback(|folder| AppMessage::NewFileClick { folder })}
                         new_folder_click={ctx.link().callback(|folder| AppMessage::NewFolderClick { folder })}
                         root_node={Rc::clone(&self.root_node)} />
+                    <div class={classes!("footer")}>
+                        <button
+                            disabled={self.compiling}
+                            onclick={ctx.link().callback(|_| AppMessage::Compile)}>
+                            if self.compiling {
+                                {"Compiling..."}
+                            } else {
+                                {"Compile"}
+                            }
+                        </button>
+                        <button
+                            disabled={self.compiled.is_none()}
+                            onclick={ctx.link().callback(|_| AppMessage::DownloadProject)}>{"Download Compiled Project"}</button>
+                    </div>
                 </div>
                 <div class={classes!("code")}>
                     <div class={classes!("filename")}>
@@ -256,7 +342,7 @@ impl Component for App {
                         wrap={"off"}
                         onchange={ctx.link().callback(|event| AppMessage::ContentChange { event })}
                         value={&self.selected_file_contents}
-                        disabled={self.selected_id.is_none()} >
+                        disabled={self.selected_id.is_none() || self.compiling} >
                     </textarea>
                 </div>
             </div>

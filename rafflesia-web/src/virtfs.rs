@@ -1,13 +1,15 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
+
+use serde::{Deserialize, Serialize};
 
 // todo: is `id` needed here?
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct VirtualFs {
     root: Entry
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum Entry {
     File {
         id: String,
@@ -15,7 +17,7 @@ pub enum Entry {
     },
     Folder {
         id: String,
-        children: HashMap<String, Entry>
+        children: BTreeMap<String, Entry>
     }
 }
 
