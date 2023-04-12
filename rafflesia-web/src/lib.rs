@@ -56,7 +56,7 @@ pub struct App {
     compiler_worker: Box<dyn Bridge<CompilerWorker>>,
 
     compiling: bool, // true if we're compiling, will block all user input.
-    compiled: Option<ProjectData>,
+    // compiled: Option<ProjectData>,
 }
 
 impl App {
@@ -88,7 +88,6 @@ pub enum AppMessage {
     CompileFinished(CompilerWorkerOutput),
 
     Compile,
-    DownloadProject,
 }
 
 impl Component for App {
@@ -123,7 +122,7 @@ impl Component for App {
             compiler_worker: worker,
 
             compiling: false,
-            compiled: None
+            // compiled: None
         }
     }
 
@@ -234,56 +233,50 @@ impl Component for App {
             AppMessage::CompileFinished(response) => {
                 match response {
                     CompilerWorkerOutput::Success(project_data) => {
-                        self.compiled = Some(project_data);
+                        // self.compiled = Some(project_data);
                         self.compiling = false;
+
+                        // download it
+                        let mut writer = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+
+                        writer.start_file("view", Default::default()).unwrap();
+                        writer.write_all(project_data.view.as_slice()).unwrap();
+                        writer.start_file("logic", Default::default()).unwrap();
+                        writer.write_all(project_data.logic.as_slice()).unwrap();
+                        writer.start_file("file", Default::default()).unwrap();
+                        writer.write_all(project_data.file.as_slice()).unwrap();
+                        writer.start_file("resource", Default::default()).unwrap();
+                        writer.write_all(project_data.resource.as_slice()).unwrap();
+                        writer.start_file("library", Default::default()).unwrap();
+                        writer.write_all(project_data.library.as_slice()).unwrap();
+
+                        writer.add_directory("project", Default::default()).unwrap();
+                        writer.start_file("project/project", Default::default()).unwrap();
+                        writer.write_all(project_data.project.as_slice()).unwrap();
+
+                        let result = writer.finish().unwrap().into_inner();
+
+                        let blob = Blob::new_with_options(result.as_slice(), Some("application/zip"));
+                        let doc = web_sys::window().unwrap()
+                            .document().unwrap();
+                        
+                        let element = doc.create_element("a").unwrap()
+                            .dyn_into::<web_sys::HtmlElement>().unwrap();
+
+                        element.set_attribute("href", web_sys::Url::create_object_url_with_blob(&blob.into()).unwrap().as_str()).unwrap();
+                        element.set_attribute("download", "compiled-project.zip").unwrap();
+
+                        // download it :>
+                        element.click();
 
                         return true;
                     },
-                    CompilerWorkerOutput::Failure => {
-                        alert("Compilation failed, error propagation wip");
+                    CompilerWorkerOutput::Failure(error) => {
+                        alert(&format!("Compilation failed: \n{}", error));
 
                         return false;
                     },
                 }
-            },
-            AppMessage::DownloadProject => {
-                let Some(project_data) = &self.compiled else { return false; };
-
-                // fixme: is it better to move the zipping onto the service worker than to block the main thread?
-                let buffer = [0; 1000000]; // 1MB buffer
-                let mut writer = zip::ZipWriter::new(std::io::Cursor::new(buffer));
-
-                writer.start_file("view", Default::default()).unwrap();
-                writer.write_all(project_data.view.as_slice()).unwrap();
-                writer.start_file("logic", Default::default()).unwrap();
-                writer.write_all(project_data.logic.as_slice()).unwrap();
-                writer.start_file("file", Default::default()).unwrap();
-                writer.write_all(project_data.file.as_slice()).unwrap();
-                writer.start_file("resource", Default::default()).unwrap();
-                writer.write_all(project_data.resource.as_slice()).unwrap();
-                writer.start_file("library", Default::default()).unwrap();
-                writer.write_all(project_data.library.as_slice()).unwrap();
-
-                writer.add_directory("project", Default::default()).unwrap();
-                writer.start_file("project", Default::default()).unwrap();
-                writer.write_all(project_data.project.as_slice()).unwrap();
-
-                let result = writer.finish().unwrap().into_inner();
-
-                let blob = Blob::new(result.as_slice());
-                let doc = web_sys::window().unwrap()
-                    .document().unwrap();
-                
-                let element = doc.create_element("a").unwrap()
-                    .dyn_into::<web_sys::HtmlElement>().unwrap();
-
-                element.set_attribute("href", web_sys::Url::create_object_url_with_blob(&blob.into()).unwrap().as_str()).unwrap();
-                element.set_attribute("download", "compiled-project.zip").unwrap();
-
-                // download it :>
-                element.click();
-
-                return false;
             },
         }
     }
@@ -327,9 +320,6 @@ impl Component for App {
                                 {"Compile"}
                             }
                         </button>
-                        <button
-                            disabled={self.compiled.is_none()}
-                            onclick={ctx.link().callback(|_| AppMessage::DownloadProject)}>{"Download Compiled Project"}</button>
                     </div>
                 </div>
                 <div class={classes!("code")}>

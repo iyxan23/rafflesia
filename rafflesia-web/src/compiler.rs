@@ -1,3 +1,4 @@
+use anyhow::{Result, bail};
 use std::collections::HashMap;
 
 use rafflesia::{core::{self, manifest::ActivityTable}, compiler};
@@ -6,29 +7,28 @@ use swrs::{api::{screen::Screen, SketchwareProject}, parser::{file::{Orientation
 use crate::{compiler_worker::{CompilerWorkerOutput, ProjectData}, virtfs::{VirtualFs, Entry}};
 
 // todo: propagate errors
-pub fn compile(fs: VirtualFs) -> Option<RawSketchwareProject> {
-    let Entry::File { content, ..  } = fs.find_entry("swproj.toml").ok()?? else { return None; };
-    let content = String::from_utf8(content.clone()).ok()?;
+pub fn compile(fs: VirtualFs) -> Result<RawSketchwareProject> {
+    let Some(Entry::File { content, ..  }) = fs.find_entry("swproj.toml")? else { bail!("entry not found") };
+    let content = String::from_utf8(content.clone())?;
 
-    let manifest = core::manifest::parse_manifest_str(&content).ok()?; 
-    let project_name = manifest.project.name.to_owned();
+    let manifest = core::manifest::parse_manifest_str(&content)?; 
 
     let screens = compile_screens(
         manifest.activity.clone(), fs
     )?;
 
     // build a sketchware project skeleton out of the project manifest
-    let mut sw_proj: SketchwareProject = manifest.try_into().ok()?;
+    let mut sw_proj: SketchwareProject = manifest.try_into()?;
 
     // then set stuff
     sw_proj.screens = screens;
 
-    let raw: RawSketchwareProject = sw_proj.try_into().ok()?;
+    let raw: RawSketchwareProject = sw_proj.try_into()?;
 
-    Some(raw)
+    Ok(raw)
 }
 
-fn compile_screens(activities: HashMap<String, ActivityTable>, fs: VirtualFs) -> Option<Vec<Screen>> {
+fn compile_screens(activities: HashMap<String, ActivityTable>, fs: VirtualFs) -> Result<Vec<Screen>> {
     let mut screens = Vec::new();
 
     for (name, activity) in activities {
@@ -36,27 +36,27 @@ fn compile_screens(activities: HashMap<String, ActivityTable>, fs: VirtualFs) ->
         // let layout = fs::read_to_string(
         //     Path::new("src/").join(activity.layout.as_str())
         // ).context(format!("Error while reading layout file of activity {}", name))?;
-        let Entry::File { content, .. } = fs
-            .find_entry(&*format!("src/{}", activity.layout.as_str())).ok()??
-            else { return None; };
+        let Some(Entry::File { content, .. }) = fs
+            .find_entry(&*format!("src/{}", activity.layout.as_str()))?
+            else { bail!("didn't found given layout file: `{}` of activity `{}`", activity.layout, name) };
 
         let layout = String::from_utf8_lossy(content);
 
-        let parsed_layout = compiler::layout::parser::parse_layout(layout.as_ref()).ok()?;
-        let view = compiler::layout::compile_view_tree(parsed_layout).ok()?;
+        let parsed_layout = compiler::layout::parser::parse_layout(layout.as_ref())?;
+        let view = compiler::layout::compile_view_tree(parsed_layout)?;
         
 
         // then parse the logic with the provided parsed layout so the logic can access views from
         // the layout (global view access baby)
 
-        let Entry::File { content, .. } = fs
-            .find_entry(&*format!("src/{}", activity.logic.as_str())).ok()??
-            else { return None; };
+        let Some(Entry::File { content, .. }) = fs
+            .find_entry(&*format!("src/{}", activity.logic.as_str()))?
+            else { bail!("didn't found given logic file: `{}` of activity `{}`", activity.logic, name) };
 
         let logic = String::from_utf8_lossy(content);
 
-        let parsed_logic = compiler::logic::parser::parse_logic(logic.as_ref()).ok()?;
-        let logic_compile_result = compiler::logic::compile_logic(parsed_logic, &view).ok()?;
+        let parsed_logic = compiler::logic::parser::parse_logic(logic.as_ref())?;
+        let logic_compile_result = compiler::logic::compile_logic(parsed_logic, &view)?;
 
         screens.push(Screen {
             layout_name: name.clone(),
@@ -83,7 +83,7 @@ fn compile_screens(activities: HashMap<String, ActivityTable>, fs: VirtualFs) ->
         });
     }
 
-    Some(screens)
+    Ok(screens)
 }
 
 // turns a view name to a logic name, something like `main` into `MainActivity`,

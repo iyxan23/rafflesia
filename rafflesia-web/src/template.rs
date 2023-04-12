@@ -41,8 +41,7 @@ pub fn default() -> VirtualFs {
                 layout = "main.layout"
 
                 [library.compat]
-                enabled = true
-                "#).into_bytes()
+                enabled = true"#).into_bytes()
             )
         ).unwrap()
         .put_entry(
@@ -61,8 +60,7 @@ pub fn default() -> VirtualFs {
 
                         myButton.onClick {
                             toast("Hello there!")
-                        }
-                        "#).into_bytes()
+                        }"#).into_bytes()
                     )
                 ).unwrap()
                 .put_entry(
@@ -78,8 +76,7 @@ pub fn default() -> VirtualFs {
                         ) {
                             TextView (text: "Hello rafflesia"),
                             Button (text: "Click me"): myButton
-                        }
-                        "#).into_bytes()
+                        }"#).into_bytes()
                     )
                 ).unwrap()
         )

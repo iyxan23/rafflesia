@@ -199,14 +199,17 @@ impl VirtualFs {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(thiserror::Error, Debug, Clone, PartialEq)]
 pub enum IOError {
+    #[error("given path doesnt exists")]
     PathDoesntExist {
         path: Vec<String>,
     },
+    #[error("couldn't open a file, must be a folder")]
     NotAFolder {
         path: Vec<String>,
     },
+    #[error("couldn't read contents of a folder, must be a file")]
     NotAFile {
         path: Vec<String>,
     }

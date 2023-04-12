@@ -15,7 +15,7 @@ pub struct CompilerWorkerInput {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum CompilerWorkerOutput {
     Success(ProjectData),
-    Failure,
+    Failure(String),
 }
 
 // encrypted and ready-to-go
@@ -60,7 +60,7 @@ impl yew_agent::Worker for CompilerWorker {
                     library: swrs::encrypt_sw(raw.library.as_bytes()),
                 })
             })
-            .unwrap_or(CompilerWorkerOutput::Failure));
+            .unwrap_or_else(|error| CompilerWorkerOutput::Failure(error.to_string())));
     }
 
     fn name_of_resource() -> &'static str {
