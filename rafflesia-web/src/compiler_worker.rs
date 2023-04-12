@@ -66,4 +66,6 @@ impl yew_agent::Worker for CompilerWorker {
     fn name_of_resource() -> &'static str {
         "compiler_worker.js"
     }
+
+    fn resource_path_is_relative() -> bool { true }
 }
