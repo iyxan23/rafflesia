@@ -191,7 +191,7 @@ fn compile_screens(pb: &ProgressBar, activities: HashMap<String, ActivityTable>)
 
         screens.push(Screen {
             layout_name: name.clone(),
-            java_name: format!("{}Activity", view_name_to_logic(&name)),
+            java_name: view_name_to_logic(&name),
 
             layout: vec![view],
 

@@ -60,7 +60,7 @@ fn compile_screens(activities: HashMap<String, ActivityTable>, fs: VirtualFs) ->
 
         screens.push(Screen {
             layout_name: name.clone(),
-            java_name: format!("{}Activity", view_name_to_logic(&name)),
+            java_name: view_name_to_logic(&name),
 
             layout: vec![view],
 
