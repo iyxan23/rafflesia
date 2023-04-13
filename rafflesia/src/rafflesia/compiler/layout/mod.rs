@@ -89,10 +89,10 @@ pub fn compile_view_tree(parsed: View) -> Result<SWRSView, ViewCompileError> {
                 })
                 .unwrap_or_else(|| {
                     Ok(SidesValue {
-                        top: attr_number_get!("margin_top", 8),
-                        right: attr_number_get!("margin_right", 8),
-                        bottom: attr_number_get!("margin_bottom", 8),
-                        left: attr_number_get!("margin_left", 8),
+                        top: attr_number_get!("margin_top", 0),
+                        right: attr_number_get!("margin_right", 0),
+                        bottom: attr_number_get!("margin_bottom", 0),
+                        left: attr_number_get!("margin_left", 0),
                     })
                 })?;
 
@@ -166,7 +166,7 @@ pub fn compile_view_tree(parsed: View) -> Result<SWRSView, ViewCompileError> {
                 height: Size::WrapContent,
                 width: Size::WrapContent,
                 padding: SidesValue { top: 8, right: 8, bottom: 8, left: 8 },
-                margin: SidesValue { top: 8, right: 8, bottom: 8, left: 8},
+                margin: SidesValue { top: 0, right: 0, bottom: 0, left: 0 },
                 weight: 0,
                 weight_sum: 0,
                 layout_gravity: Default::default(),
