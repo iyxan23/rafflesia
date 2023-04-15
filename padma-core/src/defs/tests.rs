@@ -1,4 +1,5 @@
-use crate::{defs::{Definitions, FunctionSignature, FunctionDefinition, Dispatch, DispatchKind, Type, BlockArgument}, resolver::models::Block};
+/*
+use crate::{defs::{Definitions, FunctionDeclaration, FunctionDefinition, Dispatch, DispatchKind, Type, BlockArgument}, resolver::models::Block};
 
 use super::parse_defs;
 
@@ -20,7 +21,7 @@ function() {
         defs,
         Ok(Definitions {
             global_functions: vec![
-                (FunctionSignature {
+                (FunctionDeclaration {
                     this: None,
                     parameters: vec![],
                     name: String::from("function"),
@@ -56,7 +57,7 @@ function(s) {
         defs,
         Ok(Definitions {
             global_functions: vec![
-                (FunctionSignature {
+                (FunctionDeclaration {
                     this: None,
                     parameters: vec![Type::String],
                     name: String::from("function"),
@@ -92,7 +93,7 @@ function(s, b, d) {
         defs,
         Ok(Definitions {
             global_functions: vec![
-                (FunctionSignature {
+                (FunctionDeclaration {
                     this: None,
                     parameters: vec![Type::String, Type::Boolean, Type::Number],
                     name: String::from("function"),
@@ -134,7 +135,7 @@ function(s, b, d) {
         defs,
         Ok(Definitions {
             global_functions: vec![
-                (FunctionSignature {
+                (FunctionDeclaration {
                     this: None,
                     parameters: vec![Type::String, Type::Boolean, Type::Number],
                     name: String::from("function"),
@@ -194,7 +195,7 @@ function(s): s {
         defs,
         Ok(Definitions {
             global_functions: vec![
-                (FunctionSignature {
+                (FunctionDeclaration {
                     this: None,
                     parameters: vec![Type::String],
                     name: String::from("function"),
@@ -230,7 +231,7 @@ function(s): d {
         defs,
         Ok(Definitions {
             global_functions: vec![
-                (FunctionSignature {
+                (FunctionDeclaration {
                     this: None,
                     parameters: vec![Type::String],
                     name: String::from("function"),
@@ -279,7 +280,7 @@ d.function() {
             global_functions: vec![],
             methods: vec![(
                 Type::Number, vec![
-                    (FunctionSignature {
+                    (FunctionDeclaration {
                         this: Some(Type::Number),
                         parameters: vec![],
                         name: String::from("function"),
@@ -301,3 +302,4 @@ d.function() {
         })
     );
 }
+*/

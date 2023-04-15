@@ -2,57 +2,75 @@
 /// of a definition file.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Definitions {
-    pub global_functions: Vec<(FunctionSignature, FunctionDefinition)>,
-    pub methods: Vec<(Type, Vec<(FunctionSignature, FunctionDefinition)>)>,
+    pub global_functions: Vec<(FunctionDeclaration, FunctionBody)>,
+    pub methods: Vec<(Type, Vec<(FunctionDeclaration, FunctionBody)>)>,
     // todo: bindings and primitive exprs
     // pub bindings: Vec<(FunctionSignature, FunctionDefinition)>,
     // pub primitive_exprs: Vec<()>,
 }
 
-/// Represents a signature of a defined function.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)] // <- needed for it to be HashMap keys
-pub struct FunctionSignature {
+#[derive(Debug, Clone, PartialEq)]
+pub struct FunctionDeclaration {
     pub this: Option<Type>,
     pub parameters: Vec<Type>,
     pub name: String,
     pub return_type: Option<Type>
 }
 
-/// The acutal function's implementation.
 #[derive(Debug, Clone, PartialEq)]
-pub struct FunctionDefinition {
-    pub statements: Vec<Dispatch>,
-    pub return_statement: Option<Dispatch>,
+pub struct FunctionBody {
+    pub statements: Vec<Statement>,
 }
 
-/// A dispatch, may be a raw block or a function call from the same
-/// defs or other defs file that gets merged together.
-#[derive(Debug, Clone, PartialEq)]
-pub struct Dispatch {
-    pub kind: DispatchKind,
-    pub identifier: String,
-    pub arguments: Vec<BlockArgument>,
-    
-    // only exists if `DispatchKind` is `FunctionDispatch` this field
-    // is used to represent a method call of a defined function
-    pub this: Option<Box<BlockArgument>>,
-}
-
-/// A dispatch, may be a raw block or a function call from the same
-/// defs or other defs file that gets merged together.
-#[derive(Debug, Clone, PartialEq)]
-pub enum DispatchKind {
-    RawBlock,
-    FunctionDispatch,
-}
+// We give a strong differentiation between a statement and an expression.
+//   A statement is one line of statement, it does not return / give out any value.
+//   While expressions are the opposite.
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum BlockArgument {
-    Dispatch(Dispatch),
-    Argument { index: usize },
+pub enum Statement {
+    Block {
+        opcode: String,
+        arguments: Vec<Expression>,
+    },
+    FunctionCall {
+        name: String,
+        arguments: Vec<Expression>,
+        this: Option<Box<Expression>>,
+    },
+    Return {
+        value: Expression
+    },
+
+    // later we'll have things like `repeat` or `if` at compile time :>
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Expression {
+    Block {
+        opcode: String,
+        arguments: Vec<Expression>,
+        // return_type: Type,
+    },
+    FunctionCall {
+        name: String,
+        arguments: Vec<Expression>,
+        this: Option<Box<Expression>>,
+        // return_type: Type,
+    },
     Literal(Literal),
-    This,
 }
+
+// having `return_type` to an expression sounds like a bad idea
+
+// impl AsRef<Type> for Expression {
+//     fn as_ref(&self) -> &Type {
+//         match &self {
+//             Expression::Block { return_type, .. } |
+//             Expression::FunctionCall { return_type, .. } => return_type,
+//             Expression::Literal(lit) => lit.as_ref(),
+//         }
+//     }
+// }
 
 #[derive(Debug, Clone, PartialEq, Hash, Eq)]
 pub enum Type {
@@ -74,4 +92,14 @@ pub enum Literal {
     // Component(),
     // List(),
     // Map(),
+}
+
+impl AsRef<Type> for Literal {
+    fn as_ref(&self) -> &Type {
+        match self {
+            Literal::Boolean(_) => &Type::Boolean,
+            Literal::Number(_) => &Type::Number,
+            Literal::String(_) => &Type::String,
+        }
+    }
 }

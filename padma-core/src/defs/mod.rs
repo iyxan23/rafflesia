@@ -18,94 +18,74 @@
 // todo: convert to chumsky :>
 // todo: implement returning types
 
-pub mod error;
 pub mod models;
 
 #[cfg(test)]
 mod tests;
 
-use std::collections::HashMap;
-
-use buffered_lexer::{BufferedLexer, SpannedTokenOwned, error::ParseError};
-use error::DefsParseError;
+use chumsky::{prelude::*, input::ValueInput};
 use logos::Logos;
 
 // also export the models
 pub use models::*;
 
-pub fn parse_defs(raw: &str) -> DefsParseResult<Definitions> {
-    let mut lex: BufferedLexer<'_, Token> = BufferedLexer::new(Token::lexer(raw), Token::Error);
-
-    functions(&mut lex)
+pub fn parse_defs(raw: &str) -> Result<Definitions, ()> {
+    todo!()
 }
 
 #[derive(Logos, PartialEq, Debug, Clone)]
-pub enum Token {
+pub enum Token<'src> {
     // Block return types
-    #[token("b")]
-    TypeBoolean,
-    #[token("s")]
-    TypeString,
-    #[token("d")]
-    TypeNumber,
+    #[token("b")] TypeBoolean,
+    #[token("s")] TypeString,
+    #[token("d")] TypeNumber,
     // #[token("l")] TypeList,
     // #[token("p")] TypeComponent,
     // #[token("v")] TypeView,
-    #[token("c")]
-    TypeSingleNested,
-    #[token("e")]
-    TypeDoubleNested,
-    #[token("f")]
-    TypeEnding,
+    #[token("c")] TypeSingleNested,
+    #[token("e")] TypeDoubleNested,
+    #[token("f")] TypeEnding,
 
     // literals
-    #[token("true")]
-    LiteralTrue,
-    #[token("false")]
-    LiteralFalse,
-    #[regex(r#""([^"]|\\")*""#)]
-    LiteralString,
-    #[regex("[0-9]+(?:\\.[0-9]+)?")]
-    LiteralNumber,
+    #[token("true")] LiteralTrue,
+    #[token("false")] LiteralFalse,
+    #[regex(r#""([^"]|\\")*""#, |lex| {
+        let slice = lex.slice();
+        &slice[1..slice.len() - 1]
+    })]
+    LiteralString(&'src str),
+    #[regex("[0-9]+(?:\\.[0-9]+)?", |lex| {
+        let slice = lex.slice();
+        slice.parse::<u64>().ok()
+    })]
+    LiteralNumber(u64),
 
-    #[token("(")]
-    LParen,
-    #[token(")")]
-    RParen,
-    #[token("[")]
-    LBracket,
-    #[token("]")]
-    RBracket,
-    #[token("{")]
-    LBrace,
-    #[token("}")]
-    RBrace,
+    #[token("(")] LParen,
+    #[token(")")] RParen,
+    #[token("[")] LBracket,
+    #[token("]")] RBracket,
+    #[token("{")] LBrace,
+    #[token("}")] RBrace,
 
-    #[token("=")]
-    Equal,
-    #[token("<")]
-    Return,
-    #[token("#")]
-    Hashtag,
+    #[token("=")] Equal,
+    #[token("<")] Return,
+    #[token("#")] Hashtag,
 
-    #[token(":")]
-    Colon,
-    #[token(";")]
-    Semicolon,
-    #[token(",")]
-    Comma,
-    #[token(".")]
-    Dot,
+    #[token(":")] Colon,
+    #[token(";")] Semicolon,
+    #[token(",")] Comma,
+    #[token(".")] Dot,
 
-    #[regex(r"@\d+")]
-    Argument,
-    #[token("@@")]
-    ThisArgument,
+    #[regex(r"@\d+", |lex| lex.slice()[1..].parse::<u32>().ok())]
+    Argument(u32),
+    #[token("@@")] ThisArgument,
 
-    #[regex(r"[a-zA-Z_][a-zA-Z0-9_]*")]
-    Identifier,
-    #[regex(r#"`([^`]|\\`)*`"#)]
-    EscapedIdentifier,
+    #[regex(r#"`(?:[^`]|\\`)*`"#, |lex| {
+        // remove the ` around the string
+        let slice = lex.slice();
+        &slice[1..slice.len() - 1]
+    })]
+    #[regex(r"([a-zA-Z_][a-zA-Z0-9_]*)")] Identifier(&'src str),
 
     #[error]
     #[regex(r"[ \t\n]+", logos::skip)] // whitespace
@@ -113,341 +93,145 @@ pub enum Token {
     Error,
 }
 
-pub type DefsParseResult<T> = Result<T, DefsParseError>;
-type Lexer<'a> = BufferedLexer<'a, Token>;
+fn parser<'src, I: ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>>()
+    -> impl Parser<'src, I, Definitions, extra::Err<Rich<'src, Token<'src>>>> {
 
-fn functions(lex: &mut Lexer) -> DefsParseResult<Definitions> {
-    lex.start();
+    todo()
+}
 
-    let mut defs = Definitions { global_functions: vec![], methods: vec![] };
-    let mut methods = HashMap::new();
+fn method<'src, I: ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>>()
+    -> impl Parser<'src, I, (Type, FunctionDeclaration, FunctionBody), extra::Err<Rich<'src, Token<'src>>>> {
 
-    loop {
-        // break if we've reached EOF, but propagate lexer errors
-        if let Err(err) = lex.peek() {
-            match err {
-                ParseError::EOF { .. } => break,
-                ParseError::LexerError { .. } => Err(err)?,
-                _ => unreachable!()
+    typ()
+        .then_ignore(just(Token::Dot))
+        .then(function())
+        .map(|(typ, (func_dec, func_body))| (typ, func_dec, func_body))
+}
+
+fn function<'src, I: ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>>()
+    -> impl Parser<'src, I, (FunctionDeclaration, FunctionBody), extra::Err<Rich<'src, Token<'src>>>> {
+
+    f_declaration()
+        .then(f_body()
+            .delimited_by(just(Token::LBrace), just(Token::RBrace)))
+}
+
+fn f_declaration<'src, I: ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>>()
+    -> impl Parser<'src, I, FunctionDeclaration, extra::Err<Rich<'src, Token<'src>>>> {
+
+    let ident = select! { Token::Identifier(ident) => ident };
+
+    let args = typ()
+        .separated_by(just(Token::Comma)).allow_trailing()
+        .collect::<Vec<Type>>()
+        .delimited_by(just(Token::LParen), just(Token::RParen));
+
+    let ret_type = just(Token::Colon).then(typ()).or_not();
+
+    ident
+        .then(args)
+        .then(ret_type)
+        .map(|((ident, args), ret_type)| {
+            FunctionDeclaration {
+                this: None,
+                parameters: args,
+                name: ident.to_string(),
+                return_type: ret_type.map(|a| a.1),
             }
-        }
-
-        let (func_signature, func_def) = function(lex)?;
-        if let Some(sign) = func_signature.this.clone() {
-            methods
-                .entry(sign)
-                .or_insert_with(|| vec![])
-                .push((func_signature, func_def));
-        } else {
-            defs.global_functions.push((func_signature, func_def));
-        }
-    }
-
-    // after we've collected all the methods, we turn them into a vec
-    defs.methods = methods.into_iter().collect();
-
-    lex.success();
-    Ok(defs)
+        })
 }
 
-fn function(lex: &mut Lexer) -> DefsParseResult<(FunctionSignature, FunctionDefinition)> {
-    let (this, func_ident) = match lex.expect_multiple_choices(&[
-        Token::Identifier,
-        Token::TypeBoolean,
-        Token::TypeNumber,
-        Token::TypeString,
-    ])? {
-        ident @ SpannedTokenOwned {
-            token: Token::Identifier,
-            ..
-        } => (None, ident),
-        SpannedTokenOwned {
-            token: Token::TypeBoolean,
-            ..
-        }
-        | SpannedTokenOwned {
-            token: Token::TypeNumber,
-            ..
-        }
-        | SpannedTokenOwned {
-            token: Token::TypeString,
-            ..
-        } => {
-            let _ = lex.previous();
-            let parent = r#type(lex)?;
-
-            lex.expect(Token::Dot)?;
-
-            let ident = lex.expect(Token::Identifier)?;
-
-            (Some(parent), ident)
-        }
-        _ => unreachable!(),
-    };
-
-    let parameters = parameters(lex)?;
-
-    // check if there is a `:` (indicating a return type)
-    let return_type = lex
-        .expect_failsafe(Token::Colon)?
-        .map(|_| r#type(lex))
-        .transpose()?;
-
-    // todo: check for the `=` sign that indicates binding
-
-    let (statements, return_statement) = statements_block(lex)?;
-
-    Ok((
-        FunctionSignature {
-            this,
-            parameters,
-            name: func_ident.slice,
-            return_type,
-        },
-        FunctionDefinition {
-            statements,
-            return_statement
-        },
-    ))
+// doesn't take `{` nor `}`
+fn f_body<'src, I: ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>>()
+    -> impl Parser<'src, I, FunctionBody, extra::Err<Rich<'src, Token<'src>>>> {
+    statement()
+        .repeated()
+        .collect::<Vec<Statement>>()
+        .map(|statements| FunctionBody { statements })
 }
 
-// this function takes `(` and `)` tokens as well
-fn parameters(lex: &mut Lexer) -> DefsParseResult<Vec<Type>> {
-    lex.start();
-    lex.expect(Token::LParen)?;
+// doesn't take a `;`
+fn statement<'src, I: ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>>()
+    -> impl Parser<'src, I, Statement, extra::Err<Rich<'src, Token<'src>>>> {
+    let block = just(Token::Hashtag)
+        .ignore_then(select! { Token::Identifier(ident) => ident })
+        .then(arguments()
+            .delimited_by(just(Token::LParen), just(Token::RParen)))
+        .map(|(ident, args)| Statement::Block {
+            opcode: ident.to_string(),
+            arguments: args
+        });
 
-    let mut parameters = vec![];
+    let function_call = 
+        expr()
+            .then(just(Token::Dot)).or_not()
+            .then(select! { Token::Identifier(ident) => ident })
+            .then(arguments()
+                .delimited_by(just(Token::LParen), just(Token::RParen)))
+            .map(|((this, ident), args)| Statement::FunctionCall {
+                name: ident.to_ascii_lowercase(),
+                arguments: args,
+                this: this.map(|(expr, _tok)| Box::new(expr)),
+            });
 
-    loop {
-        if let Some(_) = lex.expect_failsafe(Token::RParen)? {
-            break;
-        }
+    let return_stmt = just(Token::Return)
+        .ignore_then(expr())
+        .map(|expr| Statement::Return { value: expr } );
 
-        parameters.push(r#type(lex)?);
-        let Some(_) = lex.expect_failsafe(Token::Comma)? else {
-            lex.expect(Token::RParen)?;
-            break
-        };
-    }
-
-    lex.success();
-    Ok(parameters)
+    choice((block, function_call, return_stmt))
 }
 
-fn r#type(lex: &mut Lexer) -> DefsParseResult<Type> {
-    Ok(
-        match lex.expect_multiple_choices(&[
-            Token::TypeBoolean,
-            Token::TypeNumber,
-            Token::TypeString,
-        ])? {
-            SpannedTokenOwned {
-                token: Token::TypeBoolean,
-                ..
-            } => Type::Boolean,
-            SpannedTokenOwned {
-                token: Token::TypeNumber,
-                ..
-            } => Type::Number,
-            SpannedTokenOwned {
-                token: Token::TypeString,
-                ..
-            } => Type::String,
-            _ => unreachable!(),
-        },
-    )
+// doesn't take `(` nor `)`
+fn arguments<'src, I: ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>>()
+    -> impl Parser<'src, I, Vec<Expression>, extra::Err<Rich<'src, Token<'src>>>> {
+    expr()
+        .separated_by(just(Token::Comma)).allow_trailing()
+        .collect::<Vec<Expression>>()
 }
 
-// also parses the `{` `}`
-// returns:
-//   .0 -> the actual statements inside the function
-//   .1 -> the return statement (if it exists)
-fn statements_block(lex: &mut Lexer) -> DefsParseResult<(Vec<Dispatch>, Option<Dispatch>)> {
-    lex.start();
-    let mut blocks = vec![];
-    let mut return_statement = None;
+fn expr<'src, I: ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>>()
+    -> impl Parser<'src, I, Expression, extra::Err<Rich<'src, Token<'src>>>> {
+    recursive(|expr| {
+        let block = just(Token::Hashtag)
+            .ignore_then(select! { Token::Identifier(ident) => ident })
+            .then(arguments()
+                .delimited_by(just(Token::LParen), just(Token::RParen)))
+            .map(|(ident, args)| Expression::Block {
+                opcode: ident.to_string(),
+                arguments: args,
+            });
 
-    // open up `{`
-    lex.expect(Token::LBrace)?;
+        let function_call =
+            expr.then(just(Token::Dot)).or_not()
+                .then(select! { Token::Identifier(ident) => ident })
+                .then(arguments()
+                    .delimited_by(just(Token::LParen), just(Token::RParen)))
+                .map(|((this, ident), args)| Expression::FunctionCall {
+                    name: ident.to_ascii_lowercase(),
+                    arguments: args,
+                    this: this.map(|(expr, _tok)| Box::new(expr)),
+                });
 
-    // check if this is empty
-    if lex.expect_failsafe(Token::RBrace)?.is_some() {
-        // return early
-        return Ok((blocks, return_statement));
-    }
+        let literal = choice((
+            just(Token::LiteralFalse).to(Literal::Boolean(false)),
+            just(Token::LiteralTrue).to(Literal::Boolean(true)),
 
-    // there are block dispatches in this statements block
-    while !lex.expect_failsafe(Token::RBrace)?.is_some() {
-        // check if there is a `<` which indicates a return statement
-        if lex.expect_failsafe(Token::Return)?.is_some() {
-            // we then parse it as a regular statement, and then expect for `}`
-            return_statement = Some(statement(lex)?);
+            select! { Token::LiteralNumber(num) => num }
+                .map(|num| Literal::Number(num)),
 
-            lex.expect(Token::RBrace)?;
-            break;
-        } else {
-            blocks.push(statement(lex)?);
-        }
-    }
+            select! { Token::LiteralString(str) => str }
+                .map(|str| Literal::String(str.to_string())),
+        )).map(Expression::Literal);
 
-    lex.success();
-    Ok((blocks, return_statement))
-}
-
-fn statement(lex: &mut Lexer) -> DefsParseResult<Dispatch> {
-    lex.start();
-
-    // todo: methods
-    let block = block_dispatch(lex)?;
-
-    lex.expect(Token::Semicolon)?;
-    lex.success();
-    Ok(block)
-}
-
-fn block_dispatch(lex: &mut Lexer) -> DefsParseResult<Dispatch> {
-    lex.start();
-
-    // check whether it's a raw block or call to another function
-    let raw_block = lex.expect_failsafe(Token::Hashtag)?.is_some();
-    
-    let identifier =
-        match lex.expect_multiple_choices(&[Token::Identifier, Token::EscapedIdentifier])? {
-            SpannedTokenOwned {
-                token: Token::Identifier,
-                slice,
-                ..
-            } => slice,
-            SpannedTokenOwned {
-                token: Token::EscapedIdentifier,
-                mut slice,
-                ..
-            } => {
-                // remove its ` ` around the identifier
-                slice.remove(0);
-                slice.pop();
-                slice
-            }
-            _ => unreachable!(),
-        };
-
-    let arguments = arguments(lex)?;
-
-    lex.success();
-    Ok(Dispatch {
-        kind: if raw_block { DispatchKind::RawBlock } else { DispatchKind::FunctionDispatch },
-        identifier,
-        arguments,
-        this: None, // todo: implement method call parsing
+        choice((block.boxed(), function_call.boxed(), literal))
     })
 }
 
-// also takes `(` `)`
-fn arguments(lex: &mut Lexer) -> DefsParseResult<Vec<BlockArgument>> {
-    lex.start();
-    let mut arguments = vec![];
-    lex.expect(Token::LParen)?;
-
-    loop {
-        if let Some(_) = lex.expect_failsafe(Token::RParen)? {
-            break;
-        }
-
-        arguments.push(argument(lex)?);
-        if lex.expect_failsafe(Token::Comma)?.is_none() {
-            lex.expect(Token::RParen)?;
-            break;
-        }
-    }
-
-    lex.success();
-    Ok(arguments)
-}
-
-// basically arguments of dispatches
-fn argument(lex: &mut Lexer) -> DefsParseResult<BlockArgument> {
-    lex.start();
-    // can be a literal, or a call to another block, or an argument
-    Ok(
-        match lex.expect_multiple_choices(&[
-            // literals
-            Token::LiteralFalse,
-            Token::LiteralTrue,
-            Token::LiteralString,
-            Token::LiteralNumber,
-            // a block dispatch
-            Token::Hashtag,
-            // an argument
-            Token::Argument,
-            Token::ThisArgument,
-        ])? {
-            // ===> literals
-            SpannedTokenOwned {
-                token: Token::LiteralTrue,
-                ..
-            } => {
-                lex.success();
-                BlockArgument::Literal(Literal::Boolean(true))
-            }
-            SpannedTokenOwned {
-                token: Token::LiteralFalse,
-                ..
-            } => {
-                lex.success();
-                BlockArgument::Literal(Literal::Boolean(false))
-            }
-            SpannedTokenOwned {
-                token: Token::LiteralString,
-                mut slice,
-                ..
-            } => {
-                lex.success();
-                // remove its `"` `"`
-                slice.remove(0);
-                slice.pop();
-                BlockArgument::Literal(Literal::String(slice))
-            }
-            SpannedTokenOwned {
-                token: Token::LiteralNumber,
-                slice,
-                ..
-            } => {
-                lex.success();
-                // safety: .unwrap() since the LiteralNumber token can only be of numbers as defined in the lexer
-                BlockArgument::Literal(Literal::Number(slice.parse().unwrap()))
-            }
-
-            // ===> a hashtag indicates an identifier to a block dispatch
-            SpannedTokenOwned { token: Token::Hashtag, .. } => {
-                // go back since we want to leave the parsing to `block_dispatch`
-                lex.previous();
-                lex.success();
-
-                BlockArgument::Dispatch(block_dispatch(lex)?)
-            }
-
-            // ===> arguments
-            SpannedTokenOwned {
-                token: Token::Argument,
-                mut slice,
-                ..
-            } => {
-                lex.success();
-                // remove the `@` in the front
-                slice.remove(0);
-                // safety: .unwrap() since the Argument token is guaranteed to be number after the `@`
-                BlockArgument::Argument {
-                    index: slice.parse().unwrap(),
-                }
-            }
-            SpannedTokenOwned {
-                token: Token::ThisArgument,
-                ..
-            } => {
-                lex.success();
-                BlockArgument::This
-            }
-            _ => unreachable!(),
-        },
-    )
+fn typ<'src, I: ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>>()
+    -> impl Parser<'src, I, Type, extra::Err<Rich<'src, Token<'src>>>> {
+    choice((
+        just(Token::TypeBoolean).to(Type::Boolean),
+        just(Token::TypeNumber).to(Type::Number),
+        just(Token::TypeString).to(Type::String),
+    ))
 }
