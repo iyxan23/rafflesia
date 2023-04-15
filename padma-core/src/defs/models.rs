@@ -1,12 +1,23 @@
+use std::collections::HashMap;
+
 /// Top-level structure, represents the whole file. Contains definitions
 /// of a definition file.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Definitions {
     pub global_functions: Vec<(FunctionDeclaration, FunctionBody)>,
-    pub methods: Vec<(Type, Vec<(FunctionDeclaration, FunctionBody)>)>,
+    pub methods: HashMap<Type, Vec<(FunctionDeclaration, FunctionBody)>>,
     // todo: bindings and primitive exprs
     // pub bindings: Vec<(FunctionSignature, FunctionDefinition)>,
     // pub primitive_exprs: Vec<()>,
+}
+
+impl Default for Definitions {
+    fn default() -> Self {
+        Self {
+            global_functions: Default::default(),
+            methods: Default::default()
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -58,6 +69,8 @@ pub enum Expression {
         // return_type: Type,
     },
     Literal(Literal),
+    Argument(u32),
+    This,
 }
 
 // having `return_type` to an expression sounds like a bad idea

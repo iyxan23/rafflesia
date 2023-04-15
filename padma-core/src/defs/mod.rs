@@ -14,23 +14,26 @@
 //    may be defined in a .blks file, but this parser does not
 //    care about that file. It only parses a .defs file and that's it
 
-// todo: a method call inside def
-// todo: convert to chumsky :>
-// todo: implement returning types
-
 pub mod models;
 
 #[cfg(test)]
 mod tests;
 
-use chumsky::{prelude::*, input::ValueInput};
+use chumsky::{prelude::*, input::{ValueInput, Stream}};
 use logos::Logos;
 
 // also export the models
 pub use models::*;
 
-pub fn parse_defs(raw: &str) -> Result<Definitions, ()> {
-    todo!()
+pub fn parse_defs(raw: &str) -> Result<Definitions, Vec<Rich<Token, SimpleSpan>>> {
+    let lex = Token::lexer(raw)
+        .spanned()
+        .map(|(tok, span)| (tok, span.into()));
+
+    let stream = Stream::from_iter(lex)
+        .spanned((raw.len()..raw.len()).into());
+
+    parser().parse(stream).into_result()
 }
 
 #[derive(Logos, PartialEq, Debug, Clone)]
@@ -96,7 +99,26 @@ pub enum Token<'src> {
 fn parser<'src, I: ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>>()
     -> impl Parser<'src, I, Definitions, extra::Err<Rich<'src, Token<'src>>>> {
 
-    todo()
+    empty()
+        .map(|_| Definitions::default())
+        .foldl(choice((
+                method().map(|(typ, decl, body)| (Some(typ), decl, body)),
+                function().map(|(decl, body)| (None, decl, body))
+            )).repeated(),
+            |mut acc, (typ, func_decl, func_body)| {
+                if let Some(typ) = typ {
+                    acc.methods
+                        .entry(typ)
+                        .or_insert_with(|| vec![])
+                        .push((func_decl, func_body));
+                } else {
+                    acc.global_functions
+                        .push((func_decl, func_body))
+                }
+
+                acc
+            })
+    
 }
 
 fn method<'src, I: ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>>()
@@ -191,6 +213,8 @@ fn arguments<'src, I: ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>>(
 
 fn expr<'src, I: ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>>()
     -> impl Parser<'src, I, Expression, extra::Err<Rich<'src, Token<'src>>>> {
+
+    // i have no idea how to use this `recursive` function
     recursive(|expr| {
         let block = just(Token::Hashtag)
             .ignore_then(select! { Token::Identifier(ident) => ident })
@@ -201,29 +225,37 @@ fn expr<'src, I: ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>>()
                 arguments: args,
             });
 
-        let function_call =
-            expr.then(just(Token::Dot)).or_not()
-                .then(select! { Token::Identifier(ident) => ident })
-                .then(arguments()
-                    .delimited_by(just(Token::LParen), just(Token::RParen)))
-                .map(|((this, ident), args)| Expression::FunctionCall {
-                    name: ident.to_ascii_lowercase(),
-                    arguments: args,
-                    this: this.map(|(expr, _tok)| Box::new(expr)),
-                });
-
         let literal = choice((
             just(Token::LiteralFalse).to(Literal::Boolean(false)),
             just(Token::LiteralTrue).to(Literal::Boolean(true)),
 
             select! { Token::LiteralNumber(num) => num }
-                .map(|num| Literal::Number(num)),
+                .map(Literal::Number),
 
             select! { Token::LiteralString(str) => str }
                 .map(|str| Literal::String(str.to_string())),
         )).map(Expression::Literal);
 
-        choice((block.boxed(), function_call.boxed(), literal))
+        let other = choice((
+            just(Token::ThisArgument).to(Expression::This),
+            select! { Token::Argument(num) => Expression::Argument(num) }
+        ));
+
+        let function_call =
+            select! { Token::Identifier(ident) => ident }
+            .then(arguments()
+                .delimited_by(just(Token::LParen), just(Token::RParen)));
+
+        choice((
+            block, literal, other,
+            expr.then_ignore(just(Token::Dot)).or_not()
+                .then(function_call)
+                .map(|(this, (ident, args))| Expression::FunctionCall {
+                    name: ident.to_ascii_lowercase(),
+                    arguments: args,
+                    this: this.map(Box::new),
+                })
+        )).boxed()
     })
 }
 
