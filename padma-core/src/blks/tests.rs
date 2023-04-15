@@ -1,8 +1,6 @@
 #[test]
 fn simple() {
-    let content = r#"// contains block definitions that'll be used on the types
-
-[component]doToast: "toast %s";
+    let content = r#"[component]doToast: "toast %s";
 [operator]`&&`(b): "%b and %b";
 [operator]toString(s): "toString %d without decimal";
 [operator]`+`(d): "%d + %d";
@@ -11,6 +9,7 @@ fn simple() {
 [math]random: "pick random %d to %d";"#;
 
     let blks = super::parse_blks(content).unwrap();
+    println!("{:?}", blks);
 
     for def in blks.0 {
         println!("{:?}", def);

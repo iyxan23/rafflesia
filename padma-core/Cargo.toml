@@ -15,3 +15,4 @@ swrs = { path = "../swrs" }
 
 thiserror = "^1.0.38"
 logos = "0.12.1"
+chumsky = "1.0.0-alpha.3" # so that i can use the `Rich` error type
