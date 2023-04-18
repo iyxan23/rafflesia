@@ -127,7 +127,10 @@ fn method<'src, I: ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>>()
     typ()
         .then_ignore(just(Token::Dot))
         .then(function())
-        .map(|(typ, (func_dec, func_body))| (typ, func_dec, func_body))
+        .map(|(typ, (mut func_dec, func_body))| {
+            func_dec.this = Some(typ.clone());
+            (typ, func_dec, func_body)
+        })
 }
 
 fn function<'src, I: ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>>()
