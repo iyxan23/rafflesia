@@ -167,6 +167,7 @@ fn f_declaration<'src, I: ValueInput<'src, Token = Token<'src>, Span = SimpleSpa
 fn f_body<'src, I: ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>>()
     -> impl Parser<'src, I, FunctionBody, extra::Err<Rich<'src, Token<'src>>>> {
     statement()
+        .then_ignore(just(Token::Semicolon))
         .repeated()
         .collect::<Vec<Statement>>()
         .map(|statements| FunctionBody { statements })
@@ -175,9 +176,17 @@ fn f_body<'src, I: ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>>()
 // doesn't take a `;`
 fn statement<'src, I: ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>>()
     -> impl Parser<'src, I, Statement, extra::Err<Rich<'src, Token<'src>>>> {
+    let expr = expr().boxed();
+
+    let arguments = 
+        expr.clone()
+            .separated_by(just(Token::Comma)).allow_trailing()
+            .collect::<Vec<Expression>>()
+            .boxed();
+
     let block = just(Token::Hashtag)
         .ignore_then(select! { Token::Identifier(ident) => ident })
-        .then(arguments()
+        .then(arguments.clone()
             .delimited_by(just(Token::LParen), just(Token::RParen)))
         .map(|(ident, args)| Statement::Block {
             opcode: ident.to_string(),
@@ -185,40 +194,55 @@ fn statement<'src, I: ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>>(
         });
 
     let function_call = 
-        expr()
-            .then(just(Token::Dot)).or_not()
+        expr.clone()
+            .then_ignore(just(Token::Dot)).or_not()
             .then(select! { Token::Identifier(ident) => ident })
-            .then(arguments()
+            .then(arguments
                 .delimited_by(just(Token::LParen), just(Token::RParen)))
-            .map(|((this, ident), args)| Statement::FunctionCall {
-                name: ident.to_ascii_lowercase(),
-                arguments: args,
-                this: this.map(|(expr, _tok)| Box::new(expr)),
+            .map(|((this, ident), args)| {
+                if let Some(this) = this {
+                    Statement::MethodCall {
+                        name: ident.to_ascii_lowercase(),
+                        arguments: args,
+                        this: Box::new(this),
+                    }
+                } else {
+                    Statement::FunctionCall {
+                        name: ident.to_ascii_lowercase(),
+                        arguments: args,
+                    }
+                }
             });
 
     let return_stmt = just(Token::Return)
-        .ignore_then(expr())
+        .ignore_then(expr)
         .map(|expr| Statement::Return { value: expr } );
 
     choice((block, function_call, return_stmt))
 }
 
-// doesn't take `(` nor `)`
-fn arguments<'src, I: ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>>()
-    -> impl Parser<'src, I, Vec<Expression>, extra::Err<Rich<'src, Token<'src>>>> {
-    expr()
-        .separated_by(just(Token::Comma)).allow_trailing()
-        .collect::<Vec<Expression>>()
-}
-
 fn expr<'src, I: ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>>()
     -> impl Parser<'src, I, Expression, extra::Err<Rich<'src, Token<'src>>>> {
-
-    // i have no idea how to use this `recursive` function
     recursive(|expr| {
+        let arguments = 
+            expr
+                .separated_by(just(Token::Comma)).allow_trailing()
+                .collect::<Vec<Expression>>()
+                .boxed();
+
+        let function_call = 
+            select! { Token::Identifier(ident) => ident }
+                .then(arguments.clone()
+                    .delimited_by(just(Token::LParen), just(Token::RParen)))
+                .map(|(ident, args)| Expression::FunctionCall {
+                    name: ident.to_string(),
+                    arguments: args,
+                })
+                .boxed();
+
         let block = just(Token::Hashtag)
             .ignore_then(select! { Token::Identifier(ident) => ident })
-            .then(arguments()
+            .then(arguments
                 .delimited_by(just(Token::LParen), just(Token::RParen)))
             .map(|(ident, args)| Expression::Block {
                 opcode: ident.to_string(),
@@ -241,21 +265,27 @@ fn expr<'src, I: ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>>()
             select! { Token::Argument(num) => Expression::Argument(num) }
         ));
 
-        let function_call =
-            select! { Token::Identifier(ident) => ident }
-            .then(arguments()
-                .delimited_by(just(Token::LParen), just(Token::RParen)));
+        let expr = choice((
+            block, literal, other, function_call.clone()
+        )).boxed();
 
-        choice((
-            block, literal, other,
-            expr.then_ignore(just(Token::Dot)).or_not()
-                .then(function_call)
-                .map(|(this, (ident, args))| Expression::FunctionCall {
-                    name: ident.to_ascii_lowercase(),
-                    arguments: args,
-                    this: this.map(Box::new),
-                })
-        )).boxed()
+        expr.then(
+                just(Token::Dot)
+                    .ignore_then(function_call)
+                    .or_not())
+            .map(|(expr, method_call)| {
+                if let Some(method_call) = method_call {
+                    // safety: method_call can never be anything else other than
+                    //         Expression::FunctionCall, see the parser function_call
+                    let Expression::FunctionCall { name, arguments } = method_call
+                        else { unreachable!() };
+
+                    Expression::MethodCall { name, arguments, this: Box::new(expr) }
+                } else {
+                    expr
+                }
+            })
+            .boxed()
     })
 }
 

@@ -46,7 +46,11 @@ pub enum Statement {
     FunctionCall {
         name: String,
         arguments: Vec<Expression>,
-        this: Option<Box<Expression>>,
+    },
+    MethodCall {
+        name: String,
+        arguments: Vec<Expression>,
+        this: Box<Expression>,
     },
     Return {
         value: Expression
@@ -65,7 +69,12 @@ pub enum Expression {
     FunctionCall {
         name: String,
         arguments: Vec<Expression>,
-        this: Option<Box<Expression>>,
+        // return_type: Type,
+    },
+    MethodCall {
+        name: String,
+        arguments: Vec<Expression>,
+        this: Box<Expression>,
         // return_type: Type,
     },
     Literal(Literal),
