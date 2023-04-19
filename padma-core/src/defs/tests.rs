@@ -1,4 +1,4 @@
-use crate::{defs::{Definitions, FunctionSignature, FunctionDefinition, Dispatch, DispatchKind, Type, BlockArgument}, resolver::models::Block};
+use crate::{defs::{Definitions, FunctionDeclaration, Type, FunctionBody, Statement, Expression}};
 
 use super::parse_defs;
 
@@ -6,6 +6,17 @@ use super::parse_defs;
 // todo: write tests for methods, raw block as argument, function as argument,
 //       literals, calling functions from literals, returning literals
 //       literals as argument,
+
+macro_rules! collection {
+    // map-like
+    ($($k:expr => $v:expr),* $(,)?) => {{
+        core::convert::From::from([$(($k, $v),)*])
+    }};
+    // set-like
+    ($($v:expr),* $(,)?) => {{
+        core::convert::From::from([$($v,)*])
+    }};
+}
 
 #[test]
 fn function() {
@@ -20,25 +31,22 @@ function() {
         defs,
         Ok(Definitions {
             global_functions: vec![
-                (FunctionSignature {
+                (FunctionDeclaration {
                     this: None,
                     parameters: vec![],
                     name: String::from("function"),
                     return_type: None,
                 },
-                FunctionDefinition {
+                FunctionBody {
                     statements: vec![
-                        Dispatch {
-                            kind: DispatchKind::RawBlock,
-                            identifier: String::from("myBlock"),
-                            arguments: vec![],
-                            this: None
+                        Statement::Block {
+                            opcode: String::from("myBlock"),
+                            arguments: vec![]
                         }
                     ],
-                    return_statement: None,
                 })
             ],
-            methods: vec![]
+            methods: collection![]
         })
     );
 }
@@ -56,25 +64,22 @@ function(s) {
         defs,
         Ok(Definitions {
             global_functions: vec![
-                (FunctionSignature {
+                (FunctionDeclaration {
                     this: None,
                     parameters: vec![Type::String],
                     name: String::from("function"),
                     return_type: None,
                 },
-                FunctionDefinition {
+                FunctionBody {
                     statements: vec![
-                        Dispatch {
-                            kind: DispatchKind::RawBlock,
-                            identifier: String::from("myBlock"),
-                            arguments: vec![BlockArgument::Argument { index: 0 }],
-                            this: None
+                        Statement::Block {
+                            opcode: String::from("myBlock"),
+                            arguments: vec![Expression::Argument(0)],
                         }
                     ],
-                    return_statement: None,
                 })
             ],
-            methods: vec![]
+            methods: collection![]
         })
     );
 }
@@ -92,29 +97,26 @@ function(s, b, d) {
         defs,
         Ok(Definitions {
             global_functions: vec![
-                (FunctionSignature {
+                (FunctionDeclaration {
                     this: None,
                     parameters: vec![Type::String, Type::Boolean, Type::Number],
                     name: String::from("function"),
                     return_type: None,
                 },
-                FunctionDefinition {
+                FunctionBody {
                     statements: vec![
-                        Dispatch {
-                            kind: DispatchKind::RawBlock,
-                            identifier: String::from("myBlock"),
+                        Statement::Block {
+                            opcode: String::from("myBlock"),
                             arguments: vec![
-                                BlockArgument::Argument { index: 0 },
-                                BlockArgument::Argument { index: 1 },
-                                BlockArgument::Argument { index: 2 },
+                                Expression::Argument(0),
+                                Expression::Argument(1),
+                                Expression::Argument(2),
                             ],
-                            this: None
                         }
                     ],
-                    return_statement: None,
                 })
             ],
-            methods: vec![]
+            methods: collection![]
         })
     );
 }
@@ -134,49 +136,42 @@ function(s, b, d) {
         defs,
         Ok(Definitions {
             global_functions: vec![
-                (FunctionSignature {
+                (FunctionDeclaration {
                     this: None,
                     parameters: vec![Type::String, Type::Boolean, Type::Number],
                     name: String::from("function"),
                     return_type: None,
                 },
-                FunctionDefinition {
+                FunctionBody {
                     statements: vec![
-                        Dispatch {
-                            kind: DispatchKind::RawBlock,
-                            identifier: String::from("myBlock"),
+                        Statement::Block {
+                            opcode: String::from("myBlock"),
                             arguments: vec![
-                                BlockArgument::Argument { index: 0 },
-                                BlockArgument::Argument { index: 1 },
-                                BlockArgument::Argument { index: 2 },
+                                Expression::Argument(0),
+                                Expression::Argument(1),
+                                Expression::Argument(2),
                             ],
-                            this: None
                         },
-                        Dispatch {
-                            kind: DispatchKind::RawBlock,
-                            identifier: String::from("myOtherBlock"),
+                        Statement::Block {
+                            opcode: String::from("myOtherBlock"),
                             arguments: vec![
-                                BlockArgument::Argument { index: 1 },
-                                BlockArgument::Argument { index: 0 },
-                                BlockArgument::Argument { index: 2 },
-                                BlockArgument::Argument { index: 2 },
+                                Expression::Argument(1),
+                                Expression::Argument(0),
+                                Expression::Argument(2),
+                                Expression::Argument(2),
                             ],
-                            this: None
                         },
-                        Dispatch {
-                            kind: DispatchKind::RawBlock,
-                            identifier: String::from("loremIpsum"),
+                        Statement::Block {
+                            opcode: String::from("loremIpsum"),
                             arguments: vec![
-                                BlockArgument::Argument { index: 2 },
-                                BlockArgument::Argument { index: 1 },
+                                Expression::Argument(2),
+                                Expression::Argument(1),
                             ],
-                            this: None
                         },
                     ],
-                    return_statement: None,
                 })
             ],
-            methods: vec![]
+            methods: collection![]
         })
     );
 }
@@ -194,23 +189,24 @@ function(s): s {
         defs,
         Ok(Definitions {
             global_functions: vec![
-                (FunctionSignature {
+                (FunctionDeclaration {
                     this: None,
                     parameters: vec![Type::String],
                     name: String::from("function"),
                     return_type: Some(Type::String),
                 },
-                FunctionDefinition {
-                    statements: vec![],
-                    return_statement: Some(Dispatch {
-                        kind: DispatchKind::RawBlock,
-                        identifier: String::from("opcode"),
-                        arguments: vec![BlockArgument::Argument { index: 0 }],
-                        this: None,
-                    }),
+                FunctionBody {
+                    statements: vec![
+                        Statement::Return {
+                            value: Expression::Block {
+                                opcode: String::from("opcode"),
+                                arguments: vec![Expression::Argument(0)]
+                            }
+                        }
+                    ],
                 })
             ],
-            methods: vec![]
+            methods: collection![]
         })
     );
 }
@@ -230,36 +226,32 @@ function(s): d {
         defs,
         Ok(Definitions {
             global_functions: vec![
-                (FunctionSignature {
+                (FunctionDeclaration {
                     this: None,
                     parameters: vec![Type::String],
                     name: String::from("function"),
                     return_type: Some(Type::Number),
                 },
-                FunctionDefinition {
+                FunctionBody {
                     statements: vec![
-                        Dispatch {
-                            kind: DispatchKind::RawBlock,
-                            identifier: String::from("lorem"),
+                        Statement::Block {
+                            opcode: String::from("lorem"),
                             arguments: vec![],
-                            this: None,
                         },
-                        Dispatch {
-                            kind: DispatchKind::RawBlock,
-                            identifier: String::from("ipsum"),
-                            arguments: vec![BlockArgument::Argument { index: 0 }],
-                            this: None,
+                        Statement::Block {
+                            opcode: String::from("ipsum"),
+                            arguments: vec![Expression::Argument(0)],
                         },
+                        Statement::Return {
+                            value: Expression::Block {
+                                opcode: String::from("opcode"),
+                                arguments: vec![Expression::Argument(0)]
+                            }
+                        }
                     ],
-                    return_statement: Some(Dispatch {
-                        kind: DispatchKind::RawBlock,
-                        identifier: String::from("opcode"),
-                        arguments: vec![BlockArgument::Argument { index: 0 }],
-                        this: None,
-                    }),
                 })
             ],
-            methods: vec![]
+            methods: collection![]
         })
     );
 }
@@ -277,27 +269,24 @@ d.function() {
         defs,
         Ok(Definitions {
             global_functions: vec![],
-            methods: vec![(
-                Type::Number, vec![
-                    (FunctionSignature {
+            methods: collection!{
+                Type::Number => vec![
+                    (FunctionDeclaration {
                         this: Some(Type::Number),
                         parameters: vec![],
                         name: String::from("function"),
                         return_type: None,
                     },
-                    FunctionDefinition {
+                    FunctionBody {
                         statements: vec![
-                            Dispatch {
-                                kind: DispatchKind::RawBlock,
-                                identifier: String::from("myBlock"),
-                                arguments: vec![BlockArgument::This],
-                                this: None
+                            Statement::Block {
+                                opcode: String::from("myBlock"),
+                                arguments: vec![Expression::This],
                             }
                         ],
-                        return_statement: None,
                     })
-                ])
-            ]
+                ]
+            }
         })
     );
 }
