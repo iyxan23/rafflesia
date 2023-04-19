@@ -71,7 +71,7 @@ macro_rules! methods {
             $($typ => vec![
                 $(
                     (FunctionDeclaration {
-                        this: None,
+                        this: Some($typ),
                         parameters: vec![$($param_typ,)*],
                         name: String::from(stringify!($ident)),
                         return_type: $ret_typ,
@@ -178,21 +178,10 @@ function() {
     assert_eq!(
         defs,
         Ok(Definitions {
-            global_functions: vec![
-                (FunctionDeclaration {
-                    this: None,
-                    parameters: vec![],
-                    name: String::from("function"),
-                    return_type: None,
+            global_functions: global_functions![
+                function(): None => {
+                    stmt!(#myBlock());
                 },
-                FunctionBody {
-                    statements: vec![
-                        Statement::Block {
-                            opcode: String::from("myBlock"),
-                            arguments: vec![]
-                        }
-                    ],
-                })
             ],
             methods: collection![]
         })
@@ -211,21 +200,10 @@ function(s) {
     assert_eq!(
         defs,
         Ok(Definitions {
-            global_functions: vec![
-                (FunctionDeclaration {
-                    this: None,
-                    parameters: vec![Type::String],
-                    name: String::from("function"),
-                    return_type: None,
+            global_functions: global_functions![
+                function(typ!(s)): None => {
+                    stmt!(#myBlock(arg!(0)));
                 },
-                FunctionBody {
-                    statements: vec![
-                        Statement::Block {
-                            opcode: String::from("myBlock"),
-                            arguments: vec![Expression::Argument(0)],
-                        }
-                    ],
-                })
             ],
             methods: collection![]
         })
@@ -236,7 +214,7 @@ function(s) {
 fn function_parameters() {
     let code = r#"
 function(s, b, d) {
-    #myBlock(@0, @1, @2);
+    #myBlock(@0, @1, @2, "literal", 25, false);
 }
 "#;
     let defs = parse_defs(code);
@@ -244,25 +222,13 @@ function(s, b, d) {
     assert_eq!(
         defs,
         Ok(Definitions {
-            global_functions: vec![
-                (FunctionDeclaration {
-                    this: None,
-                    parameters: vec![Type::String, Type::Boolean, Type::Number],
-                    name: String::from("function"),
-                    return_type: None,
+            global_functions: global_functions![
+                function(typ!(s), typ!(b), typ!(d)): None => {
+                    stmt!(#myBlock(
+                        arg!(0), arg!(1), arg!(2),
+                        expr!(s: "literal"), expr!(d: 25), expr!(b: false)
+                    ));
                 },
-                FunctionBody {
-                    statements: vec![
-                        Statement::Block {
-                            opcode: String::from("myBlock"),
-                            arguments: vec![
-                                Expression::Argument(0),
-                                Expression::Argument(1),
-                                Expression::Argument(2),
-                            ],
-                        }
-                    ],
-                })
             ],
             methods: collection![]
         })
@@ -283,41 +249,12 @@ function(s, b, d) {
     assert_eq!(
         defs,
         Ok(Definitions {
-            global_functions: vec![
-                (FunctionDeclaration {
-                    this: None,
-                    parameters: vec![Type::String, Type::Boolean, Type::Number],
-                    name: String::from("function"),
-                    return_type: None,
+            global_functions: global_functions![
+                function(typ!(s), typ!(b), typ!(d)): None => {
+                    stmt!(#myBlock(arg!(0), arg!(1), arg!(2)));
+                    stmt!(#myOtherBlock(arg!(1), arg!(0), arg!(2), arg!(2)));
+                    stmt!(#loremIpsum(arg!(2), arg!(1)));
                 },
-                FunctionBody {
-                    statements: vec![
-                        Statement::Block {
-                            opcode: String::from("myBlock"),
-                            arguments: vec![
-                                Expression::Argument(0),
-                                Expression::Argument(1),
-                                Expression::Argument(2),
-                            ],
-                        },
-                        Statement::Block {
-                            opcode: String::from("myOtherBlock"),
-                            arguments: vec![
-                                Expression::Argument(1),
-                                Expression::Argument(0),
-                                Expression::Argument(2),
-                                Expression::Argument(2),
-                            ],
-                        },
-                        Statement::Block {
-                            opcode: String::from("loremIpsum"),
-                            arguments: vec![
-                                Expression::Argument(2),
-                                Expression::Argument(1),
-                            ],
-                        },
-                    ],
-                })
             ],
             methods: collection![]
         })
@@ -336,23 +273,10 @@ function(s): s {
     assert_eq!(
         defs,
         Ok(Definitions {
-            global_functions: vec![
-                (FunctionDeclaration {
-                    this: None,
-                    parameters: vec![Type::String],
-                    name: String::from("function"),
-                    return_type: Some(Type::String),
+            global_functions: global_functions![
+                function(typ!(s)): Some(typ!(s)) => {
+                    stmt!(< expr!(#opcode(arg!(0))));
                 },
-                FunctionBody {
-                    statements: vec![
-                        Statement::Return {
-                            value: Expression::Block {
-                                opcode: String::from("opcode"),
-                                arguments: vec![Expression::Argument(0)]
-                            }
-                        }
-                    ],
-                })
             ],
             methods: collection![]
         })
@@ -373,31 +297,12 @@ function(s): d {
     assert_eq!(
         defs,
         Ok(Definitions {
-            global_functions: vec![
-                (FunctionDeclaration {
-                    this: None,
-                    parameters: vec![Type::String],
-                    name: String::from("function"),
-                    return_type: Some(Type::Number),
+            global_functions: global_functions![
+                function(typ!(s)): Some(typ!(d)) => {
+                    stmt!(#lorem());
+                    stmt!(#ipsum(arg!(0)));
+                    stmt!(< expr!(#opcode(arg!(0))));
                 },
-                FunctionBody {
-                    statements: vec![
-                        Statement::Block {
-                            opcode: String::from("lorem"),
-                            arguments: vec![],
-                        },
-                        Statement::Block {
-                            opcode: String::from("ipsum"),
-                            arguments: vec![Expression::Argument(0)],
-                        },
-                        Statement::Return {
-                            value: Expression::Block {
-                                opcode: String::from("opcode"),
-                                arguments: vec![Expression::Argument(0)]
-                            }
-                        }
-                    ],
-                })
             ],
             methods: collection![]
         })
@@ -417,23 +322,12 @@ d.function() {
         defs,
         Ok(Definitions {
             global_functions: vec![],
-            methods: collection!{
-                Type::Number => vec![
-                    (FunctionDeclaration {
-                        this: Some(Type::Number),
-                        parameters: vec![],
-                        name: String::from("function"),
-                        return_type: None,
+            methods: methods! {
+                typ!(d) => [
+                    function(): None => {
+                        stmt!(#myBlock(expr!(this)));
                     },
-                    FunctionBody {
-                        statements: vec![
-                            Statement::Block {
-                                opcode: String::from("myBlock"),
-                                arguments: vec![Expression::This],
-                            }
-                        ],
-                    })
-                ]
+                ],
             }
         })
     );
