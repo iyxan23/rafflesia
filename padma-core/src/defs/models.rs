@@ -6,8 +6,8 @@ use std::collections::HashMap;
 pub struct Definitions {
     pub global_functions: Vec<(FunctionDeclaration, FunctionBody)>,
     pub methods: HashMap<Type, Vec<(FunctionDeclaration, FunctionBody)>>,
+    pub bindings: Vec<(BindingDeclaration, BindingBody)>,
     // todo: bindings and primitive exprs
-    // pub bindings: Vec<(FunctionSignature, FunctionDefinition)>,
     // pub primitive_exprs: Vec<()>,
 }
 
@@ -15,7 +15,8 @@ impl Default for Definitions {
     fn default() -> Self {
         Self {
             global_functions: Default::default(),
-            methods: Default::default()
+            methods: Default::default(),
+            bindings: Default::default(),
         }
     }
 }
@@ -32,6 +33,48 @@ pub struct FunctionDeclaration {
 pub struct FunctionBody {
     pub statements: Vec<Statement>,
 }
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct BindingDeclaration {
+    pub this: Option<Type>,
+ 
+    // a binding optionally takes parameters. If there is no parameter
+    // specified, the resolver will implicitly take its parameters
+    // depending on the block's / function's parameters.
+    pub parameters: Option<Vec<Type>>,
+
+    pub name: String,
+    pub return_type: Option<Type>
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum BindingBody {
+    Block {
+        opcode: String,
+
+        // None if arguments are implicit
+        arguments: Option<Vec<Expression>>
+    },
+    FunctionCall {
+        name: String,
+
+        // None if arguments are implicit
+        arguments: Option<Vec<Expression>>
+    },
+
+    // note for resolver:
+    //   for a "smarter" move, the resolver should check if `this` is a
+    //   StaticVariable of StaticVariable::This. And if it is and
+    //   arguments is None, we should only pass in `@0`+ as variables
+    //   instead of `@@`. (see docs/padma-notation.md)
+    MethodCall {
+        name: String,
+        this: Expression,
+
+        arguments: Option<Vec<Expression>>
+    },
+}
+
 
 // We give a strong differentiation between a statement and an expression.
 //   A statement is one line of statement, it does not return / give out any value.
@@ -77,6 +120,15 @@ pub enum Expression {
         this: Box<Expression>,
         // return_type: Type,
     },
+
+    // things like literals, arguments, and `this`
+    StaticVariable(StaticVariable),
+}
+
+/// Anything that is other than dispatching blocks.
+/// Things like literals, argument, and `this`.
+#[derive(Debug, Clone, PartialEq)]
+pub enum StaticVariable {
     Literal(Literal),
     Argument(u32),
     This,

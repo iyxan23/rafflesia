@@ -104,6 +104,38 @@ d.name(s) { #block(@0, @@); }
 // or creating a method, `n.toString(): s = #toString`.
 ```
 
+More complex expressions on bindings
+
+Specifying a return type to a binding implicitly tells the resolver that
+the statement after that is treated as a return statement.
+
+```
+// name = "hello world"; // error: literal is not a statement
+name: s = "hello world";
+
+//    -- might need a way to ignore arguments in bindings?
+// name(s): s = "hello world"; // error in resolver: literal can't take an argument
+
+// calling another function
+process(d): s = function;
+process(d): s = function(@0);
+process(d): s = #lorem(function(), @0); // complex expressions
+d.doSomething(b): s = @@.lorem(@0);
+d.doSomething(b): s = @@.lorem; // smart argument choosing, lorem will be invoked with (@0) and not (@@, @0).
+d.doSomething(b): s = doOtherThing(@@).lorem; // lorem will be invoked with (@@, @0)
+d.doSomething: s = #lorem; // < #lorem(@@, @0);
+
+// converts into
+
+name(): s { < "hello world"; }
+process(d): s { < function(@0); }
+process(d): s { < function(@0); }
+d.doSomething(b): s { < @@.lorem(@0); }
+d.doSomething(b): s { < @@.lorem(@0); }
+d.doSomething(b): s { < doOtherThing(@@).lorem(@@, @0); }
+d.doSomething(b): s { < #lorem(@@, @0); }
+```
+
 Calling other padma functions inside functions. Recursive calls aren't allowed.
 
 ```
