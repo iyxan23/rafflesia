@@ -238,7 +238,7 @@ macro_rules! expr {
         }
     };
     // method
-    (method $this:expr => ( $($args:expr),* $(,)* )) => {
+    (method $this:expr => $name:ident ( $($args:expr),* $(,)* )) => {
         Expression::MethodCall {
             name: stringify!($name).to_string(),
             arguments: vec![

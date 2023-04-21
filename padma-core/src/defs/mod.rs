@@ -161,10 +161,10 @@ fn binding_body<'src, I: ValueInput<'src, Token = Token<'src>, Span = SimpleSpan
             .then_ignore(just(Token::Dot))
             .then(function_call.clone())
             .map(|(this, func)| {
-                let BindingBody::FunctionCall { name, .. } = func
+                let BindingBody::FunctionCall { name, arguments } = func
                     else { unreachable!() };
 
-                BindingBody::MethodCall { name, this, arguments: None }
+                BindingBody::MethodCall { name, this, arguments }
             });
     
     let method_call_with_arguments =
@@ -205,7 +205,10 @@ fn binding_body<'src, I: ValueInput<'src, Token = Token<'src>, Span = SimpleSpan
         });
 
     choice((
-        block, function_call,
+        // to expressions being parsed as these
+        block.then_ignore(just(Token::Dot).not()),
+        function_call.then_ignore(just(Token::Dot).not()),
+
         method_call_argumentless, method_call_with_arguments
     )).boxed()
 }

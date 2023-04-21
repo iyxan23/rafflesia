@@ -685,30 +685,57 @@ fn binding_method_method_args() {
     );
 }
 
-// #[test]
-// fn binding_method_method_complex() {
-//     let code = r#"d.toString(s) = #other(@1).toString(@@, @1);"#;
-//     let defs = parse_defs(code);
+#[test]
+fn binding_method_method_complex() {
+    let code = r#"d.toString(s) = #other(@1).toString(@@, @1);"#;
+    let defs = parse_defs(code);
 
-//     assert_eq!(
-//         defs,
-//         Ok(Definitions {
-//             global_functions: global_functions![],
-//             methods: methods! {},
-//             bindings: bindings! {
-//                 functions [],
-//                 methods {
-//                     typ!(d) => [
-//                         toString(typ!(s)): None
-//                             => binding_body!(
-//                                 method expr!(#other(arg!(1))) => toString(expr!(this), arg!(1))
-//                             ),
-//                     ]
-//                 }
-//             }
-//         })
-//     );
-// }
+    assert_eq!(
+        defs,
+        Ok(Definitions {
+            global_functions: global_functions![],
+            methods: methods! {},
+            bindings: bindings! {
+                functions [],
+                methods {
+                    typ!(d) => [
+                        toString(typ!(s)): None
+                            => binding_body!(
+                                method expr!(#other(arg!(1))) => toString(expr!(this), arg!(1))
+                            ),
+                    ]
+                }
+            }
+        })
+    );
+}
+
+#[test]
+fn binding_method_method_complex_chained() {
+    let code = r#"d.toString(s) = #other(@1).doThings(@@).toString(@@, @1);"#;
+    let defs = parse_defs(code);
+
+    assert_eq!(
+        defs,
+        Ok(Definitions {
+            global_functions: global_functions![],
+            methods: methods! {},
+            bindings: bindings! {
+                functions [],
+                methods {
+                    typ!(d) => [
+                        toString(typ!(s)): None
+                            => binding_body!(
+                                method expr!(
+                                    method expr!(#other(arg!(1))) => doThings(expr!(this))
+                                ) => toString(expr!(this), arg!(1))
+                            ),
+                    ]
+                }
+            }
+        })
+    );
+}
 
 #[test]
 fn binding_method_complex_expression() {
