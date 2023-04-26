@@ -6,7 +6,7 @@
 //! into blocks which could then be emitted as compiler output.
 
 mod models;
-use std::{collections::{BTreeMap, HashMap}, rc::Rc, ops::Deref, borrow::Borrow};
+use std::{collections::{BTreeMap, HashMap}, rc::Rc, ops::Deref, borrow::Borrow, marker::PhantomData};
 
 pub use models::*;
 use swrs::api::block::{
@@ -52,7 +52,7 @@ impl ResolverPayload {
             .fold(
                 (HashMap::<Signature, DefsFunctionBody>::new(),
                 HashMap::<DefsBindingDeclaration, DefsBindingBody>::new()),
-                |acc @ (mut definitions, mut bindings), (_prio, defs)| {
+                |(mut definitions, mut bindings), (_prio, defs)| {
                     for (dec, body) in defs.global_functions {
                         definitions.insert(Signature::Function {
                             name: dec.name,
@@ -63,7 +63,7 @@ impl ResolverPayload {
 
                     for (typ, methods) in defs.methods {
                         for (dec, body) in methods {
-                            assert_eq!(Some(typ), dec.this);
+                            assert_eq!(Some(&typ), dec.this.as_ref());
 
                             definitions.insert(Signature::Method {
                                 name: dec.name,
@@ -76,7 +76,7 @@ impl ResolverPayload {
 
                     bindings.extend(defs.bindings);
 
-                    acc
+                    (definitions, bindings)
                 });
 
         Resolver {
@@ -283,7 +283,7 @@ impl Resolver {
     fn resolve_function_body(
         &mut self,
         body: DefsFunctionBody,
-        seen_functions: &mut Vec<&Signature>,
+        seen_functions: &mut Vec<Signature>,
         cache: &mut HashMap<Signature, (DefinitionBlocks, Option<BlockArgument>)>,
 
         return_type: Option<DefsType>,
@@ -336,12 +336,11 @@ impl Resolver {
     /// the cache--and returned.
     fn resolve_from_raw_function(
         &mut self,
-
         name: String,
         arguments: Vec<DefsExpression>,
         this_expr: Option<DefsExpression>,
 
-        seen_functions: &mut Vec<&Signature>,
+        seen_functions: &mut Vec<Signature>,
         cache: &mut HashMap<Signature, (DefinitionBlocks, Option<BlockArgument>)>,
 
         // needed type
@@ -351,13 +350,13 @@ impl Resolver {
         args_types: &Vec<DefsType>,
     ) -> (DefinitionBlocks, Option<BlockArgument>) {
         let mut result = DefinitionBlocks::new();
-        let mut return_value = None;
+        let mut return_value: Option<BlockArgument> = None;
 
         // convert these into a signature
         //   but first we compile their arguments first
         let arguments = arguments.into_iter()
             .map(|expr| self.resolve_expression(
-                expr, seen_functions, cache, return_type,
+                expr, seen_functions, cache, return_type.clone(),
                 this_type, args_types
             ))
             .collect::<Vec<_>>();
@@ -371,11 +370,11 @@ impl Resolver {
         
         // compile `this` if this is a method
         let this = this_expr.map(|this| self.resolve_expression(
-            this, seen_functions, cache, return_type,
+            this, seen_functions, cache, return_type.clone(),
             this_type, args_types
         ));
 
-        let this_type = this.map(|(_resolved_this, resolved_this_ret_block)| block_argument_as_type(
+        let this_type = this.as_ref().map(|(_resolved_this, resolved_this_ret_block)| block_argument_as_type(
             &resolved_this_ret_block, this_type, args_types
             // todo: error propagation
         ).expect("err: expr `this` doesn't return any value").clone());
@@ -397,12 +396,14 @@ impl Resolver {
         // so check the cache.
         if let Some((cached_blocks, cached_ret_block)) = cache.get(&signature) {
             // let's use those
-            let mut cached_ret_block = cached_ret_block.expect("err: function doesn't return a type");
+            let mut cached_ret_block = cached_ret_block
+                .as_ref().expect("err: function doesn't return a type").clone();
 
             // apply the arguments to the blocks and add this and arguments' blocks
             for block_rc in 
-                this.map(|t| t.0)
-                    .unwrap_or_else(|| vec![]).iter()
+                this.as_ref()
+                    .map(|t| t.0.as_slice())
+                    .unwrap_or_else(|| &[]).iter()
                     .chain(cached_blocks.iter()) {
 
                 let mut block = block_rc.as_ref().clone();
@@ -423,10 +424,12 @@ impl Resolver {
             return_value = Some(cached_ret_block);
 
         } else { 
+            let signature = signature;
+
             // we need to resolve this by ourselves
             // we first add this to the seen functions
             // then search for its function body.
-            seen_functions.push(&signature);
+            seen_functions.push(signature.clone());
 
             let body = self.definitions.remove(&signature)
                 // todo: error propagation
@@ -443,12 +446,13 @@ impl Resolver {
                 resolved_return_block.expect("err: function doesn't return a type");
 
             // we pop ourselves from the seen_functions
-            assert_eq!(seen_functions.pop(), Some(&signature));
+            assert_eq!(seen_functions.pop().as_ref(), Some(&signature));
 
             // finalize by appending this blocks and each arguments' blocks
             for block_rc in 
-                this.map(|t| t.0)
-                    .unwrap_or_else(||vec![]).iter()
+                this.as_ref()
+                    .map(|t| t.0.as_slice())
+                    .unwrap_or_else(|| &[]).iter()
                     .chain(resolved_blocks.iter()) {
 
                 let mut block = block_rc.as_ref().clone();
@@ -460,12 +464,6 @@ impl Resolver {
 
                 result.push(Rc::new(block));
             }
-
-            let arg_ret_blocks: Vec<BlockArgument> = arguments.into_iter()
-                .map(|(arg_blocks, arg_ret_block)| {
-                    result.extend(arg_blocks);
-                    arg_ret_block
-                }).collect::<Vec<_>>();
 
             apply_block_argument_arguments(
                 &mut resolved_return_block, &arguments,
@@ -484,7 +482,7 @@ impl Resolver {
     fn resolve_expression(
         &mut self,
         expr: DefsExpression,
-        seen_functions: &mut Vec<&Signature>,
+        seen_functions: &mut Vec<Signature>,
         cache: &mut HashMap<Signature, (DefinitionBlocks, Option<BlockArgument>)>,
 
         // needed type
@@ -524,11 +522,12 @@ impl Resolver {
                 let arguments =
                     spec_args.into_iter()
                         .zip(arguments.into_iter())
-                        .map(|(spec_arg, expr)| (swrs_arg_to_type(spec_arg), expr));
+                        .map(|(spec_arg, expr)| (swrs_arg_to_type(spec_arg), expr))
+                        .collect::<Vec<_>>();
 
                 return_value = BlockArgument::Block(Rc::new(Block {
                     opcode, content: block.spec.clone(),
-                    arguments: arguments
+                    arguments: arguments.into_iter()
                         .map(|(typ, expr)| {
                             let (blocks, value) = self.resolve_expression(
                                 expr, seen_functions, cache, typ,
