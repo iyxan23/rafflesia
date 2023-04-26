@@ -6,7 +6,7 @@
 //! into blocks which could then be emitted as compiler output.
 
 mod models;
-use std::{collections::{BTreeMap, HashMap}, rc::Rc, ops::Deref, borrow::Borrow, marker::PhantomData};
+use std::{collections::{BTreeMap, HashMap}, rc::Rc};
 
 pub use models::*;
 use swrs::api::block::{
@@ -111,6 +111,28 @@ impl Resolver {
         // first we resolve bindings, which might resolve some other definitions.
         self.resolve_bindings(&mut result);
 
+        // second, we'll loop over definitions and resolve each of them.
+        let mut seen_functions = vec![];
+
+        while let Some((signature, body))
+            = self.definitions
+                .keys().next().cloned()
+                .and_then(|key| self.definitions.remove_entry(&key)) {
+
+            let (this_type, args_types) = match &signature {
+                Signature::Function { parameters, .. } => (None, parameters),
+                Signature::Method { this, parameters, .. } => (Some(this), parameters),
+            };
+
+            let resolved = self.resolve_function_body(
+                body, &mut seen_functions, &mut result.definitions, None,
+                this_type, args_types
+            );
+
+            result.definitions.insert(signature, resolved);
+        }
+
+        // finally we all got the definitions resolved!
         result
     }
 
@@ -350,7 +372,7 @@ impl Resolver {
         args_types: &Vec<DefsType>,
     ) -> (DefinitionBlocks, Option<BlockArgument>) {
         let mut result = DefinitionBlocks::new();
-        let mut return_value: Option<BlockArgument> = None;
+        let return_value;
 
         // convert these into a signature
         //   but first we compile their arguments first

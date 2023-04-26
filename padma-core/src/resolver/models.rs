@@ -27,10 +27,11 @@ pub enum Signature {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Definitions {
     pub blocks: Vec<Rc<Block>>,
-    pub definitions: HashMap<Signature, DefinitionBlocks>,
+    pub definitions: HashMap<Signature, (DefinitionBlocks, BlockReturn)>,
 }
 
 pub type DefinitionBlocks = Vec<Rc<Block>>; 
+pub type BlockReturn = Option<BlockArgument>;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Block {
