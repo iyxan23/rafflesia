@@ -1,12 +1,14 @@
 use std::collections::HashMap;
 
+// todo: add spans on these!
+
 /// Top-level structure, represents the whole file. Contains definitions
 /// of a definition file.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Definitions {
-    pub global_functions: Vec<(FunctionDeclaration, FunctionBody)>,
-    pub methods: HashMap<Type, Vec<(FunctionDeclaration, FunctionBody)>>,
-    pub bindings: Vec<(BindingDeclaration, BindingBody)>,
+    pub global_functions: HashMap<FunctionDeclaration, FunctionBody>,
+    pub methods: HashMap<Type, HashMap<FunctionDeclaration, FunctionBody>>,
+    pub bindings: HashMap<BindingDeclaration, BindingBody>,
     // todo: bindings and primitive exprs
     // pub primitive_exprs: Vec<()>,
 }
@@ -21,7 +23,7 @@ impl Default for Definitions {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)] // <- needed for HashMap
 pub struct FunctionDeclaration {
     pub this: Option<Type>,
     pub parameters: Vec<Type>,
@@ -34,7 +36,7 @@ pub struct FunctionBody {
     pub statements: Vec<Statement>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)] // <- needed for hashmap
 pub struct BindingDeclaration {
     pub this: Option<Type>,
  
@@ -102,6 +104,30 @@ pub enum Statement {
     // later we'll have things like `repeat` or `if` at compile time :>
 }
 
+impl Into<Expression> for Statement {
+    /// Tries to convert an [`Statement`] to be a [`Expression`]. This conversion
+    /// should and is only done for statements that returns a value. It is not
+    /// supposed to be used to convert regular statements into expressions
+    /// as both of them are different.
+    /// 
+    /// Any variants are converted as-is, with a little exception of the [`Statement::Return`]
+    /// variant, which is converted implicitly by taking it's value as an expression
+    /// and using that as a result.
+    fn into(self) -> Expression {
+        match self {
+            Statement::Block { opcode, arguments } => 
+                Expression::Block { opcode, arguments },
+            Statement::FunctionCall { name, arguments } =>
+                Expression::FunctionCall { name, arguments },
+            Statement::MethodCall { name, arguments, this } =>
+                Expression::MethodCall { name, arguments, this },
+
+            Statement::Return { value } => value,
+        }
+    }
+}
+
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expression {
     Block {
@@ -123,6 +149,30 @@ pub enum Expression {
 
     // things like literals, arguments, and `this`
     StaticVariable(StaticVariable),
+}
+
+impl TryInto<Statement> for Expression {
+    type Error = StaticVariable;
+
+    /// Tries to convert an [`Expression`] to be a [`Statement`]. This conversion
+    /// should and is only done for expressions that was previously thought to be
+    /// a statement. It is not supposed to be used to convert regular expressions
+    /// into statements as both of them are different.
+    /// 
+    /// This will only succeed if the given [`Expression`] is anything other
+    /// than [`Expression::StaticVariable`], since its not possible for 
+    fn try_into(self) -> Result<Statement, Self::Error> {
+        Ok(match self {
+            Expression::Block { opcode, arguments } => 
+                Statement::Block { opcode, arguments },
+            Expression::FunctionCall { name, arguments } =>
+                Statement::FunctionCall { name, arguments },
+            Expression::MethodCall { name, arguments, this } =>
+                Statement::MethodCall { name, arguments, this },
+
+            Expression::StaticVariable(v) => Err(v)?,
+        })
+    }
 }
 
 /// Anything that is other than dispatching blocks.

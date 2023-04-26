@@ -23,17 +23,16 @@ macro_rules! global_functions {
     [$($ident:ident($($param_typ:expr),* $(,)*): $ret_typ:expr => {
         $($stmt:expr;)*
     },)*] => {
-        vec![
+        collection![
             $(
-                (FunctionDeclaration {
+                FunctionDeclaration {
                     this: None,
                     parameters: vec![$($param_typ,)*],
                     name: String::from(stringify!($ident)),
                     return_type: $ret_typ,
-                },
-                FunctionBody {
+                } => FunctionBody {
                     statements: vec![$($stmt,)*],
-                }),
+                },
             )*
         ]
     }
@@ -60,17 +59,16 @@ macro_rules! methods {
             },)*]),* $(,)*
     } => {
         collection! {
-            $($typ => vec![
+            $($typ => collection![
                 $(
-                    (FunctionDeclaration {
+                    FunctionDeclaration {
                         this: Some($typ),
                         parameters: vec![$($param_typ,)*],
                         name: String::from(stringify!($ident)),
                         return_type: $ret_typ,
-                    },
-                    FunctionBody {
+                    } => FunctionBody {
                         statements: vec![$($stmt,)*],
-                    }),
+                    },
                 )*
             ]),*
         }
@@ -90,66 +88,64 @@ bindings!{
 }
 */
 macro_rules! bindings {
-    { functions [
+    { $(functions [
         $($func_ident:ident $(($($func_param_typ:expr),* $(,)*))?: $func_ret_typ:expr => $func_body:expr,)*
-    ], methods {
+    ],)? $(methods {
         $($method_typ:expr => [
             $($method_ident:ident $(($($method_param_typ:expr),* $(,)*))?: $method_ret_typ:expr => $method_body:expr,)*
         ]),* $(,)*
-    } } => {
-        vec![
+    })? } => {
+        collection![
             // functions
-            $(
-                binding_func!($func_ident $(($($func_param_typ,)*))*: $func_ret_typ => $func_body),
-            )*
+            $($(
+                binding_func_dec!($func_ident $(($($func_param_typ,)*))*: $func_ret_typ) => $func_body,
+            )*)?
 
             // methods
-            $(
-                $(
-                    binding_method!($method_typ =>
-                        $method_ident $(($($method_param_typ,)*))*: $method_ret_typ => $method_body
-                    ),
-                )*
-            )*
+            $($($(
+                binding_method_dec!($method_typ =>
+                    $method_ident $(($($method_param_typ,)*))*: $method_ret_typ
+                ) => $method_body,
+            )*)*)?
         ]
     }
 }
 
-macro_rules! binding_func {
-    ($func_ident:ident($($func_param_typ:expr),* $(,)*): $func_ret_typ:expr => $func_body:expr) => {
-        (BindingDeclaration {
+macro_rules! binding_func_dec {
+    ($func_ident:ident($($func_param_typ:expr),* $(,)*): $func_ret_typ:expr) => {
+        BindingDeclaration {
             this: None,
             parameters: Some(vec![$($func_param_typ,)*]),
             name: String::from(stringify!($func_ident)),
             return_type: $func_ret_typ,
-        }, $func_body)
+        }
     };
-    ($func_ident:ident: $func_ret_typ:expr => $func_body:expr) => {
-        (BindingDeclaration {
+    ($func_ident:ident: $func_ret_typ:expr) => {
+        BindingDeclaration {
             this: None,
             parameters: None,
             name: String::from(stringify!($func_ident)),
             return_type: $func_ret_typ,
-        }, $func_body)
+        }
     };
 }
 
-macro_rules! binding_method {
-    ($this:expr => $method_ident:ident ($($method_param_typ:expr),* $(,)*): $method_ret_typ:expr => $method_body:expr) => {
-        (BindingDeclaration {
+macro_rules! binding_method_dec {
+    ($this:expr => $method_ident:ident ($($method_param_typ:expr),* $(,)*): $method_ret_typ:expr) => {
+        BindingDeclaration {
             this: Some($this),
             parameters: Some(vec![$($method_param_typ,)*]),
             name: String::from(stringify!($method_ident)),
             return_type: $method_ret_typ,
-        }, $method_body)
+        }
     };
-    ($this:expr => $method_ident:ident: $method_ret_typ:expr => $method_body:expr) => {
-        (BindingDeclaration {
+    ($this:expr => $method_ident:ident: $method_ret_typ:expr) => {
+        BindingDeclaration {
             this: Some($this),
             parameters: None,
             name: String::from(stringify!($method_ident)),
             return_type: $method_ret_typ,
-        }, $method_body)
+        }
     };
 }
 
@@ -295,4 +291,4 @@ macro_rules! stmt {
     }
 }
 
-pub(super) use {collection, typ, stmt, arg, expr, global_functions, methods, bindings, binding_func, binding_method, binding_body};
+pub(super) use {collection, typ, stmt, arg, expr, global_functions, methods, bindings, binding_func_dec, binding_method_dec, binding_body};

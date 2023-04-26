@@ -4,7 +4,7 @@ use crate::defs::{
 };
 
 use super::parse_defs;
-use super::test_macros::{collection, typ, stmt, arg, expr, global_functions, methods, bindings, binding_func, binding_method, binding_body};
+use super::test_macros::{collection, typ, stmt, arg, expr, global_functions, methods, bindings, binding_func_dec, binding_method_dec, binding_body};
 
 // todo: write tests for methods, raw block as argument, function as argument,
 //       literals, calling functions from literals, returning literals
@@ -28,7 +28,7 @@ function() {
                 },
             ],
             methods: collection![],
-            bindings: vec![]
+            bindings: bindings![]
         })
     );
 }
@@ -50,8 +50,8 @@ function(s) {
                     stmt!(#myBlock(arg!(0)));
                 },
             ],
-            methods: collection![],
-            bindings: vec![]
+            methods: methods! {},
+            bindings: bindings! {}
         })
     );
 }
@@ -76,8 +76,8 @@ function(s, b, d) {
                     ));
                 },
             ],
-            methods: collection![],
-            bindings: vec![]
+            methods: methods! {},
+            bindings: bindings! {}
         })
     );
 }
@@ -103,8 +103,8 @@ function(s, b, d) {
                     stmt!(#loremIpsum(arg!(2), arg!(1)));
                 },
             ],
-            methods: collection![],
-            bindings: vec![]
+            methods: methods! {},
+            bindings: bindings! {}
         })
     );
 }
@@ -126,8 +126,8 @@ function(s): s {
                     stmt!(< expr!(#opcode(arg!(0))));
                 },
             ],
-            methods: collection![],
-            bindings: vec![]
+            methods: methods! {},
+            bindings: bindings![]
         })
     );
 }
@@ -153,8 +153,8 @@ function(s): d {
                     stmt!(< expr!(#opcode(arg!(0))));
                 },
             ],
-            methods: collection![],
-            bindings: vec![]
+            methods: methods! {},
+            bindings: bindings! {}
         })
     );
 }
@@ -171,7 +171,7 @@ d.function() {
     assert_eq!(
         defs,
         Ok(Definitions {
-            global_functions: vec![],
+            global_functions: global_functions![],
             methods: methods! {
                 typ!(d) => [
                     function(): None => {
@@ -179,7 +179,7 @@ d.function() {
                     },
                 ],
             },
-            bindings: vec![]
+            bindings: bindings! {}
         })
     );
 }

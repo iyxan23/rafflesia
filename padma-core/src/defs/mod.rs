@@ -108,16 +108,16 @@ fn parser<'src, I: ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>>()
                         if let Some(typ) = typ {
                             acc.methods
                                 .entry(typ)
-                                .or_insert_with(|| vec![])
-                                .push((func_decl, func_body));
+                                .or_insert_with(|| Default::default())
+                                .insert(func_decl, func_body);
                         } else {
                             acc.global_functions
-                                .push((func_decl, func_body))
+                                .insert(func_decl, func_body);
                         }
                     }
                     (None, Some((bind_dec, bind_body))) => {
                         acc.bindings
-                            .push((bind_dec, bind_body));
+                            .insert(bind_dec, bind_body);
                     }
                     _ => unreachable!(),
                 }
