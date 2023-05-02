@@ -10,7 +10,6 @@ simple_logger = "4"
 log = "0.4"
 
 [dependencies]
-buffered-lexer = { path = "../buffered-lexer" }
 swrs = { path = "../swrs" }
 
 thiserror = "^1.0.38"
