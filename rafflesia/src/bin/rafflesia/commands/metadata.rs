@@ -1,8 +1,8 @@
+use anyhow::{bail, Context, Result};
+use clap::{AppSettings, ArgMatches, Command};
+use rafflesia::core::manifest::{parse_manifest, parse_manifest_str};
 use std::fs;
 use std::path::Path;
-use clap::{AppSettings, ArgMatches, Command};
-use anyhow::{bail, Context, Result};
-use rafflesia::core::manifest::{parse_manifest, parse_manifest_str};
 
 pub fn cli() -> Command<'static> {
     Command::new("metadata")
@@ -15,7 +15,7 @@ pub fn cli() -> Command<'static> {
 pub fn exec(args: &ArgMatches) -> Result<()> {
     let content = match fs::read_to_string(Path::new("swproj.toml")) {
         Ok(content) => content,
-        Err(_) => bail!("Couldn't get the swproj.toml file in the current working directory")
+        Err(_) => bail!("Couldn't get the swproj.toml file in the current working directory"),
     };
 
     let manifest = parse_manifest_str(&content).context("Failed to parse swproj.toml")?;
@@ -45,7 +45,11 @@ pub fn exec(args: &ArgMatches) -> Result<()> {
     print!(
         "\n{} {}",
         activity_count,
-        if activity_count > 1 { "activities:" } else { "activity:" },
+        if activity_count > 1 {
+            "activities:"
+        } else {
+            "activity:"
+        },
     );
 
     for (name, table) in manifest.activity {

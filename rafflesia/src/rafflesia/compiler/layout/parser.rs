@@ -1,7 +1,7 @@
-use logos::Logos;
-use std::collections::HashMap;
 use crate::compiler::layout::parser::parser::Token;
 use buffered_lexer::BufferedLexer;
+use logos::Logos;
+use std::collections::HashMap;
 
 #[derive(Debug, PartialEq)]
 pub struct View {
@@ -12,18 +12,17 @@ pub struct View {
 }
 
 pub fn parse_layout(raw: &str) -> Result<View, parser::LayoutParseError> {
-    let mut lex: BufferedLexer<'_, Token>
-        = BufferedLexer::new(Token::lexer(raw), Token::Error);
+    let mut lex: BufferedLexer<'_, Token> = BufferedLexer::new(Token::lexer(raw), Token::Error);
 
     // parse it :sunglasses:
     parser::view(&mut lex)
 }
 
 mod parser {
-    use std::collections::HashMap;
-    use buffered_lexer::{BufferedLexer, SpannedTokenOwned};
     use super::View;
+    use buffered_lexer::{BufferedLexer, SpannedTokenOwned};
     use logos::Logos;
+    use std::collections::HashMap;
 
     #[derive(Logos, PartialEq, Debug, Clone)]
     pub enum Token {
@@ -86,7 +85,9 @@ mod parser {
         // fixme: maybe use a new func for this?
         let view_id = if lexer.expect_failsafe_wo_eof(Token::Colon)?.is_some() {
             Some(lexer.expect(Token::Text)?.slice.to_string())
-        } else { None };
+        } else {
+            None
+        };
 
         lexer.success();
 
@@ -98,9 +99,9 @@ mod parser {
         })
     }
 
-    pub fn attributes(lexer: &mut BufferedLexer<Token>)
-        -> Result<HashMap<String, String>, LayoutParseError> {
-
+    pub fn attributes(
+        lexer: &mut BufferedLexer<Token>,
+    ) -> Result<HashMap<String, String>, LayoutParseError> {
         lexer.start();
         lexer.expect(Token::LParentheses)?;
 
@@ -117,7 +118,9 @@ mod parser {
 
         while lexer.expect_failsafe_wo_eof(Token::Comma)?.is_some() {
             // check if next is a closing parentheses, means this is a trailing comma
-            if lexer.expect_peek(Token::RParentheses).is_ok() { break; }
+            if lexer.expect_peek(Token::RParentheses).is_ok() {
+                break;
+            }
 
             // parse attribute
             let attr = attribute(lexer)?;
@@ -131,8 +134,9 @@ mod parser {
         Ok(result)
     }
 
-    pub fn attribute(lexer: &mut BufferedLexer<Token>)
-        -> Result<(String, String), LayoutParseError> {
+    pub fn attribute(
+        lexer: &mut BufferedLexer<Token>,
+    ) -> Result<(String, String), LayoutParseError> {
         lexer.start();
 
         // attr: value
@@ -147,15 +151,23 @@ mod parser {
     pub fn value(lexer: &mut BufferedLexer<Token>) -> Result<String, LayoutParseError> {
         lexer.start();
 
-        let res = match lexer.expect_multiple_choices(
-            &vec![Token::Text, Token::String]
-        )? {
-            SpannedTokenOwned { token: Token::Text, slice, .. } => slice.to_string(),
-            SpannedTokenOwned { token: Token::String, slice, .. } =>
-                /* remove the `"` around it */
-                slice[1..slice.len() - 1].to_string(),
+        let res = match lexer.expect_multiple_choices(&vec![Token::Text, Token::String])? {
+            SpannedTokenOwned {
+                token: Token::Text,
+                slice,
+                ..
+            } => slice.to_string(),
+            SpannedTokenOwned {
+                token: Token::String,
+                slice,
+                ..
+            } =>
+            /* remove the `"` around it */
+            {
+                slice[1..slice.len() - 1].to_string()
+            }
 
-            _ => unreachable!()
+            _ => unreachable!(),
         };
 
         lexer.success();
@@ -181,7 +193,9 @@ mod parser {
 
         while lexer.expect_failsafe_wo_eof(Token::Comma)?.is_some() {
             // check if next is a closing brace, means this is a trailing comma
-            if lexer.expect_peek(Token::RBrace).is_ok() { break; }
+            if lexer.expect_peek(Token::RBrace).is_ok() {
+                break;
+            }
 
             // parse child
             result.push(view(lexer)?);

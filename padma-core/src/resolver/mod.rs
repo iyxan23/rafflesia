@@ -1,27 +1,30 @@
 //! # Padma Resolver
-//! 
+//!
 //! The code that processes parsed defs ([`crate::defs::Definitions`]), matching
 //! and combining them with parsed blks ([`crate::blks::BlockDefinitions`]), to generate
 //! a single data structure of which every definitions (functions, methods) are flattened
 //! into blocks which could then be emitted as compiler output.
 
 mod models;
-use std::{collections::{BTreeMap, HashMap}, rc::Rc};
+use std::{
+    collections::{BTreeMap, HashMap},
+    rc::Rc,
+};
 
 pub use models::*;
 use swrs::api::block::{
-    Argument as SWRSArgument, BlockType as SWRSBlockType,
-    ArgumentBlockReturnType as SWRSArgumentBlockReturnType
+    Argument as SWRSArgument, ArgumentBlockReturnType as SWRSArgumentBlockReturnType,
+    BlockType as SWRSBlockType,
 };
 
 use crate::{
-    blks::{BlockDefinitions, BlockDefinition},
+    blks::{BlockDefinition, BlockDefinitions},
     defs::{
-        FunctionDeclaration as DefsFunctionDeclaration, FunctionBody as DefsFunctionBody,
-        BindingDeclaration as DefsBindingDeclaration, BindingBody as DefsBindingBody,
-        Type as DefsType, Statement as DefsStatement, Expression as DefsExpression,
-        StaticVariable as DefsStaticVariable
-    }
+        BindingBody as DefsBindingBody, BindingDeclaration as DefsBindingDeclaration,
+        Expression as DefsExpression, FunctionBody as DefsFunctionBody,
+        FunctionDeclaration as DefsFunctionDeclaration, Statement as DefsStatement,
+        StaticVariable as DefsStaticVariable, Type as DefsType,
+    },
 };
 
 use super::defs::Definitions as DefsDefinitions;
@@ -32,8 +35,14 @@ pub struct ResolverPayload {
 }
 
 impl ResolverPayload {
-    pub fn new(definitions: BTreeMap<u32, DefsDefinitions>, blocks: BTreeMap<u32, BlockDefinitions>) -> Self {
-        Self { definitions, blocks }
+    pub fn new(
+        definitions: BTreeMap<u32, DefsDefinitions>,
+        blocks: BTreeMap<u32, BlockDefinitions>,
+    ) -> Self {
+        Self {
+            definitions,
+            blocks,
+        }
     }
 
     pub fn add_definitions(&mut self, def: DefsDefinitions, priority: u32) {
@@ -48,25 +57,34 @@ impl ResolverPayload {
         let (flattened_definitions, flattened_bindings) = self
             // since BTreeMap is ordered, `into_iter()` iterates in an ascending order
             // which is exactly what we want. Higher priorities gets placed last (overrides anyone).
-            .definitions.into_iter()
+            .definitions
+            .into_iter()
             .fold(
-                (HashMap::<String, HashMap<Signature, DefsFunctionBody>>::new(),
-                HashMap::<DefsBindingDeclaration, DefsBindingBody>::new()),
+                (
+                    HashMap::<String, HashMap<Signature, DefsFunctionBody>>::new(),
+                    HashMap::<DefsBindingDeclaration, DefsBindingBody>::new(),
+                ),
                 |(mut definitions, mut bindings), (_prio, defs)| {
                     for (dec, body) in defs.global_functions {
                         if let Some(defs) = definitions.get_mut(&dec.name) {
-                            defs.insert(Signature::Function {
-                                name: dec.name,
-                                parameters: dec.parameters,
-                                return_type: dec.return_type,
-                            }, body);
+                            defs.insert(
+                                Signature::Function {
+                                    name: dec.name,
+                                    parameters: dec.parameters,
+                                    return_type: dec.return_type,
+                                },
+                                body,
+                            );
                         } else {
                             let mut hmap = HashMap::new();
-                            hmap.insert(Signature::Function {
-                                name: dec.name.clone(),
-                                parameters: dec.parameters,
-                                return_type: dec.return_type,
-                            }, body);
+                            hmap.insert(
+                                Signature::Function {
+                                    name: dec.name.clone(),
+                                    parameters: dec.parameters,
+                                    return_type: dec.return_type,
+                                },
+                                body,
+                            );
 
                             definitions.insert(dec.name, hmap);
                         }
@@ -77,20 +95,26 @@ impl ResolverPayload {
                             assert_eq!(Some(&typ), dec.this.as_ref());
 
                             if let Some(defs) = definitions.get_mut(&dec.name) {
-                                defs.insert(Signature::Method {
-                                    this: typ.clone(),
-                                    name: dec.name,
-                                    parameters: dec.parameters,
-                                    return_type: dec.return_type,
-                                }, body);
+                                defs.insert(
+                                    Signature::Method {
+                                        this: typ.clone(),
+                                        name: dec.name,
+                                        parameters: dec.parameters,
+                                        return_type: dec.return_type,
+                                    },
+                                    body,
+                                );
                             } else {
                                 let mut hmap = HashMap::new();
-                                hmap.insert(Signature::Method {
-                                    this: typ.clone(),
-                                    name: dec.name.clone(),
-                                    parameters: dec.parameters,
-                                    return_type: dec.return_type,
-                                }, body);
+                                hmap.insert(
+                                    Signature::Method {
+                                        this: typ.clone(),
+                                        name: dec.name.clone(),
+                                        parameters: dec.parameters,
+                                        return_type: dec.return_type,
+                                    },
+                                    body,
+                                );
 
                                 definitions.insert(dec.name, hmap);
                             }
@@ -100,17 +124,20 @@ impl ResolverPayload {
                     bindings.extend(defs.bindings);
 
                     (definitions, bindings)
-                });
+                },
+            );
 
         Resolver {
             definitions: flattened_definitions,
             bindings: flattened_bindings,
 
             blocks: self
-                .blocks.into_iter()
+                .blocks
+                .into_iter()
                 .fold(Default::default(), |mut acc, (_prio, blks)| {
-                    blks.0.into_iter()
-                        .for_each(|blk| { acc.insert(blk.opcode.clone(), blk); });
+                    blks.0.into_iter().for_each(|blk| {
+                        acc.insert(blk.opcode.clone(), blk);
+                    });
 
                     acc
                 }),
@@ -128,7 +155,8 @@ pub struct Resolver {
 impl Resolver {
     pub fn resolve(mut self) -> Definitions {
         let mut result = Definitions {
-            blocks: vec![], definitions: HashMap::new(),
+            blocks: vec![],
+            definitions: HashMap::new(),
         };
 
         // first we resolve bindings, which might resolve some other definitions.
@@ -139,23 +167,33 @@ impl Resolver {
 
         let mut resolved_definitions = HashMap::new();
 
-        while let Some((_name, mut overloads))
-            = self.definitions
-                .keys().next().cloned()
-                .and_then(|key| self.definitions.remove_entry(&key)) {
-
-            while let Some((signature, body))
-                    = overloads.keys().next().cloned()
-                    .and_then(|key| overloads.remove_entry(&key)) {
-
+        while let Some((_name, mut overloads)) = self
+            .definitions
+            .keys()
+            .next()
+            .cloned()
+            .and_then(|key| self.definitions.remove_entry(&key))
+        {
+            while let Some((signature, body)) = overloads
+                .keys()
+                .next()
+                .cloned()
+                .and_then(|key| overloads.remove_entry(&key))
+            {
                 let (this_type, args_types) = match &signature {
                     Signature::Function { parameters, .. } => (None, parameters),
-                    Signature::Method { this, parameters, .. } => (Some(this), parameters),
+                    Signature::Method {
+                        this, parameters, ..
+                    } => (Some(this), parameters),
                 };
 
                 let resolved = self.resolve_function_body(
-                    body, &mut seen_functions, &mut resolved_definitions, None,
-                    this_type, args_types
+                    body,
+                    &mut seen_functions,
+                    &mut resolved_definitions,
+                    None,
+                    this_type,
+                    args_types,
                 );
 
                 result.definitions.insert(signature, resolved);
@@ -183,7 +221,7 @@ impl Resolver {
 
         //         let (function_body_expr, parameter_types) =
         //             convert_to_expression(body, &self.blocks);
-                
+
         //         if let Some(declared_params) = &declaration.parameters {
         //             // verify if both the inferred type and the declared parameters matches.
         //             // (only match the ones the inferred type, any other extra declared parameters can be ignored)
@@ -194,7 +232,7 @@ impl Resolver {
         //         }
 
         //         let function_declaration = DefsFunctionDeclaration {
-        //             this: Some(this), 
+        //             this: Some(this),
         //             name: declaration.name,
         //             return_type: declaration.return_type,
 
@@ -205,7 +243,7 @@ impl Resolver {
 
         //         // infers types from the body
         //         //
-        //         // so for example, we give a block arguments of (@0, @1) and the block's 
+        //         // so for example, we give a block arguments of (@0, @1) and the block's
         //         // spec provides that it has two of those parameters, use those types.
         //         //
         //         // also check for "ambiguity", where an argument might be used in another
@@ -220,7 +258,7 @@ impl Resolver {
 
         //                 },
         //                 DefsBindingBody::MethodCall { name, this, arguments } => {
-                            
+
         //                 },
         //             }
         //         }
@@ -229,7 +267,7 @@ impl Resolver {
         //             statements: vec![if declaration.return_type.is_some() {
         //                 DefsStatement::Return { value: convert_to_expression(body) }
         //             } else {
-                        
+
         //                     // safety: .unwrap() is safe because the function conver_to_expression
         //                     //         never constructs a `DefsExpression::StaticVariable`, which
         //                     //         is the only reason the TryInto<DefsStatement> of
@@ -275,7 +313,7 @@ impl Resolver {
     // be an expression, because expression things like literals, this, or arguments
     // can't be an expression, they can only be passed into other blocks things;
     // exactly what a BlockArgument is.
-    // 
+    //
     // For instance, there are two types of blocks: A block statement and an expression
     // block (returning block). An expression block cannot be a statement, and vice versa.
     // It is separated exactly because of how the block system in sketchware works.
@@ -288,13 +326,13 @@ impl Resolver {
     // Statement blocks / statement functions are possible inside a function expression.
     // Since we can't just pack all of them into "one expression"; what we do is that we
     // take the last block of the function expression / the return value
-    // 
+    //
     //    | func my_func() {
     //    |   #blk;
     //    |   #blk;
     // => |   < #returning;
     //    | }
-    /// 
+    ///
     // we then put that as the argument of where the function expression is called.
     //
     //    | #lorem(  my_func() )
@@ -345,7 +383,9 @@ impl Resolver {
         for stmt in body.statements {
             match stmt {
                 DefsStatement::Block { opcode, arguments } => {
-                    let block = self.blocks.get(&opcode)
+                    let block = self
+                        .blocks
+                        .get(&opcode)
                         // todo: error propagation
                         .expect("todo: error: no block with opcode {} found");
 
@@ -362,30 +402,36 @@ impl Resolver {
                         panic!("invalid arguments given");
                     }
 
-                    let arguments =
-                        spec_args.into_iter()
-                            .zip(arguments.into_iter())
-                            .map(|(spec_arg, expr)| (swrs_arg_to_type(spec_arg), expr))
-                            .collect::<Vec<_>>();
+                    let arguments = spec_args
+                        .into_iter()
+                        .zip(arguments.into_iter())
+                        .map(|(spec_arg, expr)| (swrs_arg_to_type(spec_arg), expr))
+                        .collect::<Vec<_>>();
 
                     result.push(Rc::new(Block {
-                        opcode, content: block.spec.clone(),
-                        arguments: arguments.into_iter()
+                        opcode,
+                        content: block.spec.clone(),
+                        arguments: arguments
+                            .into_iter()
                             .map(|(typ, expr)| {
                                 let overloads = self.resolve_expression(
-                                    expr, seen_functions, cache,
-                                    this_type, args_types,
+                                    expr,
+                                    seen_functions,
+                                    cache,
+                                    this_type,
+                                    args_types,
                                 );
 
                                 // result.extend(blocks);
                                 // value
                                 todo!("find overload that has the right typ")
-                            }).collect(),
+                            })
+                            .collect(),
 
                         return_type: None,
                     }));
-                },
-                DefsStatement::FunctionCall { name, arguments } => { 
+                }
+                DefsStatement::FunctionCall { name, arguments } => {
                     // let arguments = arguments.into_iter()
                     //     .map(|expr|
                     //         self.resolve_expression(
@@ -404,10 +450,14 @@ impl Resolver {
                     //     return_type: None,
                     // };
                     todo!("update with the new method of indexing a definition with the name")
-                },
-                DefsStatement::MethodCall { name, arguments, this } => {
+                }
+                DefsStatement::MethodCall {
+                    name,
+                    arguments,
+                    this,
+                } => {
                     todo!()
-                },
+                }
                 DefsStatement::Return { value } => {
                     let Some(return_type) = return_type
                         else {
@@ -415,11 +465,13 @@ impl Resolver {
                             panic!("no return type, given a return statement")
                         };
 
-                    let overloads =
-                        self.resolve_expression(
-                            value, seen_functions, cache,
-                            this_type, args_types
-                        );
+                    let overloads = self.resolve_expression(
+                        value,
+                        seen_functions,
+                        cache,
+                        this_type,
+                        args_types,
+                    );
 
                     // find for the right return type
                     let Some((res_blocks, res_return_block)) = overloads.into_iter()
@@ -435,7 +487,7 @@ impl Resolver {
 
                     // skip any other statements, we're done here
                     break;
-                },
+                }
             }
         }
 
@@ -463,11 +515,9 @@ impl Resolver {
         // the outer vector are each of the arguments
         // and the inner vector contains the possible overloads of that argument
         let arguments = arguments
-            .into_iter().map(|expr| {
-                self.resolve_expression(
-                    expr, seen_functions, cache, this_type, args_types
-                )
-            }).collect::<Vec<Vec<_>>>();
+            .into_iter()
+            .map(|expr| self.resolve_expression(expr, seen_functions, cache, this_type, args_types))
+            .collect::<Vec<Vec<_>>>();
 
         // check the cache
         if let Some(cached_funcs) = cache.get(&name) {
@@ -477,11 +527,12 @@ impl Resolver {
             // what we're going to do here is to find the correct combination
             // of arguments' types that matches any signature that has types,
             // and get their blocks
-            let possible_parameters = cached_funcs.keys()
+            let possible_parameters = cached_funcs
+                .keys()
                 .into_iter()
                 .map(|signature| match signature {
-                    Signature::Function { parameters, .. } |
-                    Signature::Method { parameters, .. } => parameters,
+                    Signature::Function { parameters, .. }
+                    | Signature::Method { parameters, .. } => parameters,
                 })
                 .collect::<Vec<_>>();
 
@@ -489,8 +540,7 @@ impl Resolver {
                 .enumerate()
                 .map(|(arg_idx, combinations)| {
                     let Some((blocks, block_arg, _typ)) = combinations.into_iter()
-                        .map(|(blocks, block_arg)| 
-                            (blocks, block_argument_as_type(&block_arg, this_type, args_types).cloned(), block_arg))
+                        .map(|(blocks, block_arg)| { (blocks, block_argument_as_type(&block_arg, this_type, args_types).cloned(), block_arg) })
                         .find_map(|(blocks, arg_type, block_arg)| {
                             // todo: error propagation
                             let arg_type = arg_type.expect("err: argument .. doesn't return a value");
@@ -510,7 +560,9 @@ impl Resolver {
                 .collect::<Vec<_>>();
         }
 
-        let overloads = self.definitions.remove(&name)
+        let overloads = self
+            .definitions
+            .remove(&name)
             // todo: error propagation
             .expect("err: no such function named ...")
             .into_iter()
@@ -518,26 +570,42 @@ impl Resolver {
                 // retrieve parameter types, return types and this type from the signature
                 // of the funtion
                 let (args_types, return_type, this_type) = match &sign {
-                    Signature::Function { parameters, return_type, .. }
-                        => (parameters, return_type, None),
-                    Signature::Method { this, parameters, return_type, .. }
-                        => (parameters, return_type, Some(this)),
+                    Signature::Function {
+                        parameters,
+                        return_type,
+                        ..
+                    } => (parameters, return_type, None),
+                    Signature::Method {
+                        this,
+                        parameters,
+                        return_type,
+                        ..
+                    } => (parameters, return_type, Some(this)),
                 };
 
                 // fixme: i feel like `sign` could be moved without cloning here
-                (sign.clone(), self.resolve_function_body(
-                    body, seen_functions, cache,
-                    return_type.clone(), this_type, args_types
-                ))
+                (
+                    sign.clone(),
+                    self.resolve_function_body(
+                        body,
+                        seen_functions,
+                        cache,
+                        return_type.clone(),
+                        this_type,
+                        args_types,
+                    ),
+                )
             })
             .collect::<Vec<_>>();
-        
+
         // insert em to the cache
         let mut overloads_cache = HashMap::new();
 
-        let result = overloads.into_iter()
+        let result = overloads
+            .into_iter()
             .map(|(sign, resolved)| {
-                overloads_cache.insert(sign, resolved.clone()); resolved
+                overloads_cache.insert(sign, resolved.clone());
+                resolved
             })
             .collect();
 
@@ -559,7 +627,9 @@ impl Resolver {
     ) -> Vec<(DefinitionBlocks, BlockArgument)> {
         match expr {
             DefsExpression::Block { opcode, arguments } => {
-                let block = self.blocks.get(&opcode)
+                let block = self
+                    .blocks
+                    .get(&opcode)
                     // todo: error propagation
                     .expect("todo: error: no block with opcode {} found");
 
@@ -582,55 +652,66 @@ impl Resolver {
                     panic!("invalid arguments given")
                 }
 
-                let arguments =
-                    spec_args.into_iter()
-                        .zip(arguments.into_iter())
-                        .map(|(spec_arg, expr)| (swrs_arg_to_type(spec_arg), expr))
-                        .collect::<Vec<_>>();
+                let arguments = spec_args
+                    .into_iter()
+                    .zip(arguments.into_iter())
+                    .map(|(spec_arg, expr)| (swrs_arg_to_type(spec_arg), expr))
+                    .collect::<Vec<_>>();
 
                 let mut result = vec![];
                 let ret_val = BlockArgument::Block(Rc::new(Block {
-                    opcode, content: block.spec.clone(),
-                    arguments: arguments.into_iter()
+                    opcode,
+                    content: block.spec.clone(),
+                    arguments: arguments
+                        .into_iter()
                         .map(|(typ, expr)| {
                             let overloads = self.resolve_expression(
-                                expr, seen_functions, cache,
-                                this_type, args_types,
+                                expr,
+                                seen_functions,
+                                cache,
+                                this_type,
+                                args_types,
                             );
 
                             // find the right overload that matches the type
-                            let Some((blocks, value)) = 
-                                overloads
-                                    .into_iter()
-                                    .find(|(_blocks, arg)|
-                                        block_argument_as_type(arg, this_type, args_types)
-                                            .and_then(|arg| Some(arg == &typ))
-                                            .unwrap_or(false))
-                                    else {
-                                        // todo: error propagation
-                                        panic!("no matching overload for this expression")
-                                    };
+                            let Some((blocks, value)) = overloads
+                                .into_iter()
+                                .find(|(_blocks, arg)|
+                                    block_argument_as_type(arg, this_type, args_types)
+                                        .and_then(|arg| Some(arg == &typ))
+                                        .unwrap_or(false))
+                                else {
+                                    // todo: error propagation
+                                    panic!("no matching overload for this expression")
+                                };
 
                             result.extend(blocks);
 
                             value
-                        }).collect(),
+                        })
+                        .collect(),
 
-                    return_type: Some(block_type)
+                    return_type: Some(block_type),
                 }));
 
                 vec![(result, ret_val)]
-            },
+            }
 
             DefsExpression::FunctionCall { name, arguments } => {
-                let overloads = self.resolve_from_raw_function(
-                    name, arguments, None, seen_functions,
-                    cache, this_type, args_types
-                ).into_iter()
+                let overloads = self
+                    .resolve_from_raw_function(
+                        name,
+                        arguments,
+                        None,
+                        seen_functions,
+                        cache,
+                        this_type,
+                        args_types,
+                    )
+                    .into_iter()
                     // filter any overloads that doesn't return anything
                     // expressions **must** return something
-                    .filter_map(|(blocks, arg)|
-                        arg.and_then(|arg| Some((blocks, arg))))
+                    .filter_map(|(blocks, arg)| arg.and_then(|arg| Some((blocks, arg))))
                     .collect::<Vec<_>>();
 
                 if overloads.len() == 0 {
@@ -639,33 +720,45 @@ impl Resolver {
                 }
 
                 overloads
-            },
+            }
 
-            DefsExpression::MethodCall { name, arguments, this } => {
-                let overloads = self.resolve_from_raw_function(
-                    name, arguments, None, seen_functions,
-                    cache, this_type, args_types
-                ).into_iter()
+            DefsExpression::MethodCall {
+                name,
+                arguments,
+                this,
+            } => {
+                let overloads = self
+                    .resolve_from_raw_function(
+                        name,
+                        arguments,
+                        None,
+                        seen_functions,
+                        cache,
+                        this_type,
+                        args_types,
+                    )
+                    .into_iter()
                     // filter any overloads that doesn't return anything
                     // expressions **must** return something
-                    .filter_map(|(blocks, arg)|
-                        arg.and_then(|arg| Some((blocks, arg))))
+                    .filter_map(|(blocks, arg)| arg.and_then(|arg| Some((blocks, arg))))
                     .collect::<Vec<_>>();
-                
+
                 if overloads.len() == 0 {
                     // todo: error propagation
                     panic!("any of this function with name .. definitions doesnt return any value");
                 }
 
                 overloads
-            },
+            }
 
-            DefsExpression::StaticVariable(static_var)
-                => vec![(vec![], match static_var {
+            DefsExpression::StaticVariable(static_var) => vec![(
+                vec![],
+                match static_var {
                     DefsStaticVariable::Literal(lit) => BlockArgument::Literal(lit),
                     DefsStaticVariable::Argument(arg) => BlockArgument::Argument(arg),
                     DefsStaticVariable::This => BlockArgument::This,
-                })],
+                },
+            )],
         }
     }
 }
@@ -676,10 +769,10 @@ fn apply_block_arguments(
     the_this: Option<&BlockArgument>,
     result_blocks: &mut Vec<Rc<Block>>,
 ) {
-    block.arguments.iter_mut()
-        .for_each(|arg|
-            apply_block_argument_arguments(arg, arguments, the_this, result_blocks)
-        );
+    block
+        .arguments
+        .iter_mut()
+        .for_each(|arg| apply_block_argument_arguments(arg, arguments, the_this, result_blocks));
 }
 
 fn apply_block_argument_arguments(
@@ -690,10 +783,12 @@ fn apply_block_argument_arguments(
 ) {
     match arg {
         BlockArgument::Argument(arg_no) => {
-            let (blocks, ret_block) = arguments.get(*arg_no as usize)
+            let (blocks, ret_block) = arguments
+                .get(*arg_no as usize)
                 // safety: .unwrap is safe here because the arguments variable
                 //         has been checked thoroughly by the codes above
-                .unwrap().clone();
+                .unwrap()
+                .clone();
 
             *arg = ret_block;
             result_blocks.extend(blocks);
@@ -706,9 +801,7 @@ fn apply_block_argument_arguments(
             // recursively apply arguments on nested blocks
             let blk_ref = Rc::make_mut(blk);
 
-            apply_block_arguments(
-                blk_ref, arguments, the_this, result_blocks
-            );
+            apply_block_arguments(blk_ref, arguments, the_this, result_blocks);
 
             *arg = BlockArgument::Block(Rc::clone(blk));
         }
@@ -719,7 +812,7 @@ fn block_argument_as_type<'a, 'v: 'a>(
     block_arg: &'a BlockArgument,
 
     this_type: Option<&'a DefsType>,
-    args_types: &'v Vec<DefsType>
+    args_types: &'v Vec<DefsType>,
 ) -> Option<&'a DefsType> {
     match block_arg {
         BlockArgument::Literal(lit) => Some(lit.as_ref()),
@@ -735,11 +828,12 @@ fn swrs_block_type_to_type(arg: &SWRSBlockType) -> Option<DefsType> {
         SWRSBlockType::Argument(SWRSArgumentBlockReturnType::Boolean) => DefsType::Boolean,
         SWRSBlockType::Argument(SWRSArgumentBlockReturnType::Number) => DefsType::Boolean,
         SWRSBlockType::Argument(SWRSArgumentBlockReturnType::String) => DefsType::Boolean,
-        
-        SWRSBlockType::Argument(SWRSArgumentBlockReturnType::Component { .. }) |
-        SWRSBlockType::Argument(SWRSArgumentBlockReturnType::List { ..  }) |
-        SWRSBlockType::Argument(SWRSArgumentBlockReturnType::View { ..  })
-            => todo!("types other than primitive types"),
+
+        SWRSBlockType::Argument(SWRSArgumentBlockReturnType::Component { .. })
+        | SWRSBlockType::Argument(SWRSArgumentBlockReturnType::List { .. })
+        | SWRSBlockType::Argument(SWRSArgumentBlockReturnType::View { .. }) => {
+            todo!("types other than primitive types")
+        }
 
         SWRSBlockType::Regular | SWRSBlockType::Control(_) => None?,
     })
@@ -750,7 +844,6 @@ fn swrs_arg_to_type(arg: &SWRSArgument) -> DefsType {
         SWRSArgument::Number { .. } => DefsType::Number,
         SWRSArgument::Boolean { .. } => DefsType::Boolean,
 
-        SWRSArgument::Menu { name, .. }
-            => todo!("types other than primitive types"),
+        SWRSArgument::Menu { name, .. } => todo!("types other than primitive types"),
     }
 }

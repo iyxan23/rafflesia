@@ -28,7 +28,7 @@ pub struct FunctionDeclaration {
     pub this: Option<Type>,
     pub parameters: Vec<Type>,
     pub name: String,
-    pub return_type: Option<Type>
+    pub return_type: Option<Type>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -39,14 +39,14 @@ pub struct FunctionBody {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)] // <- needed for hashmap
 pub struct BindingDeclaration {
     pub this: Option<Type>,
- 
+
     // a binding optionally takes parameters. If there is no parameter
     // specified, the resolver will implicitly take its parameters
     // depending on the block's / function's parameters.
     pub parameters: Option<Vec<Type>>,
 
     pub name: String,
-    pub return_type: Option<Type>
+    pub return_type: Option<Type>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -55,13 +55,13 @@ pub enum BindingBody {
         opcode: String,
 
         // None if arguments are implicit
-        arguments: Option<Vec<Expression>>
+        arguments: Option<Vec<Expression>>,
     },
     FunctionCall {
         name: String,
 
         // None if arguments are implicit
-        arguments: Option<Vec<Expression>>
+        arguments: Option<Vec<Expression>>,
     },
 
     // note for resolver:
@@ -73,10 +73,9 @@ pub enum BindingBody {
         name: String,
         this: Expression,
 
-        arguments: Option<Vec<Expression>>
+        arguments: Option<Vec<Expression>>,
     },
 }
-
 
 // We give a strong differentiation between a statement and an expression.
 //   A statement is one line of statement, it does not return / give out any value.
@@ -98,9 +97,8 @@ pub enum Statement {
         this: Box<Expression>,
     },
     Return {
-        value: Expression
+        value: Expression,
     },
-
     // later we'll have things like `repeat` or `if` at compile time :>
 }
 
@@ -109,24 +107,30 @@ impl Into<Expression> for Statement {
     /// should and is only done for statements that returns a value. It is not
     /// supposed to be used to convert regular statements into expressions
     /// as both of them are different.
-    /// 
+    ///
     /// Any variants are converted as-is, with a little exception of the [`Statement::Return`]
     /// variant, which is converted implicitly by taking it's value as an expression
     /// and using that as a result.
     fn into(self) -> Expression {
         match self {
-            Statement::Block { opcode, arguments } => 
-                Expression::Block { opcode, arguments },
-            Statement::FunctionCall { name, arguments } =>
-                Expression::FunctionCall { name, arguments },
-            Statement::MethodCall { name, arguments, this } =>
-                Expression::MethodCall { name, arguments, this },
+            Statement::Block { opcode, arguments } => Expression::Block { opcode, arguments },
+            Statement::FunctionCall { name, arguments } => {
+                Expression::FunctionCall { name, arguments }
+            }
+            Statement::MethodCall {
+                name,
+                arguments,
+                this,
+            } => Expression::MethodCall {
+                name,
+                arguments,
+                this,
+            },
 
             Statement::Return { value } => value,
         }
     }
 }
-
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expression {
@@ -158,17 +162,24 @@ impl TryInto<Statement> for Expression {
     /// should and is only done for expressions that was previously thought to be
     /// a statement. It is not supposed to be used to convert regular expressions
     /// into statements as both of them are different.
-    /// 
+    ///
     /// This will only succeed if the given [`Expression`] is anything other
-    /// than [`Expression::StaticVariable`], since its not possible for 
+    /// than [`Expression::StaticVariable`], since its not possible for
     fn try_into(self) -> Result<Statement, Self::Error> {
         Ok(match self {
-            Expression::Block { opcode, arguments } => 
-                Statement::Block { opcode, arguments },
-            Expression::FunctionCall { name, arguments } =>
-                Statement::FunctionCall { name, arguments },
-            Expression::MethodCall { name, arguments, this } =>
-                Statement::MethodCall { name, arguments, this },
+            Expression::Block { opcode, arguments } => Statement::Block { opcode, arguments },
+            Expression::FunctionCall { name, arguments } => {
+                Statement::FunctionCall { name, arguments }
+            }
+            Expression::MethodCall {
+                name,
+                arguments,
+                this,
+            } => Statement::MethodCall {
+                name,
+                arguments,
+                this,
+            },
 
             Expression::StaticVariable(v) => Err(v)?,
         })

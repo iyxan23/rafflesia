@@ -1,10 +1,13 @@
 use crate::defs::{
-    Definitions, FunctionDeclaration, Type, FunctionBody, Statement, Expression,
-    Literal, StaticVariable, BindingDeclaration, BindingBody
+    BindingBody, BindingDeclaration, Definitions, Expression, FunctionBody, FunctionDeclaration,
+    Literal, Statement, StaticVariable, Type,
 };
 
 use super::parse_defs;
-use super::test_macros::{collection, typ, stmt, arg, expr, global_functions, methods, bindings, binding_func_dec, binding_method_dec, binding_body};
+use super::test_macros::{
+    arg, binding_body, binding_func_dec, binding_method_dec, bindings, collection, expr,
+    global_functions, methods, stmt, typ,
+};
 
 // todo: write tests for methods, raw block as argument, function as argument,
 //       literals, calling functions from literals, returning literals
@@ -638,7 +641,6 @@ fn binding_method_function_args() {
     );
 }
 
-
 #[test]
 fn binding_method_method() {
     let code = r#"d.toString(s, b, d) = @@.toString;"#;
@@ -739,7 +741,8 @@ fn binding_method_method_complex_chained() {
 
 #[test]
 fn binding_method_complex_expression() {
-    let code = r#"d.toString(s, b, d) = toString(#doThings(#lorem(@0), ipsum(@2)), lorem(@0, @2));"#;
+    let code =
+        r#"d.toString(s, b, d) = toString(#doThings(#lorem(@0), ipsum(@2)), lorem(@0, @2));"#;
     let defs = parse_defs(code);
 
     assert_eq!(

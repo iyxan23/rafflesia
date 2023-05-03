@@ -1,22 +1,20 @@
+use anyhow::Result;
+use chrono::{Datelike, NaiveDate, TimeZone, Timelike, Utc};
+use clap::{AppSettings, Arg, ArgMatches, Command};
+use rafflesia::core::manifest::*;
 use std::collections::HashMap;
 use std::fs;
 use std::io::{stdin, stdout, Write};
 use std::path::Path;
-use clap::{AppSettings, Arg, ArgMatches, Command};
-use anyhow::Result;
-use chrono::{Datelike, NaiveDate, Timelike, TimeZone, Utc};
 use toml::value::{Date, Datetime, Offset, Time};
-use rafflesia::core::manifest::*;
 
 pub fn cli() -> Command<'static> {
     Command::new("new")
         .dont_collapse_args_in_usage(true)
-        .args(&[
-            Arg::new("folder_name")
-                .help("The folder of where the project will be generated.")
-                .takes_value(true)
-                .required(true)
-        ])
+        .args(&[Arg::new("folder_name")
+            .help("The folder of where the project will be generated.")
+            .takes_value(true)
+            .required(true)])
         .setting(AppSettings::DeriveDisplayOrder)
         .about("Create an empty rafflesia project")
         .after_help("Run `rafflesia help new` for more detailed information.\n")
@@ -42,20 +40,25 @@ pub fn exec(args: &ArgMatches) -> Result<()> {
         let control_normal = input("colorControlNormal:", "ff57beee")?;
         let control_highlight = input("colorControlHighlight:", "20008dcd")?;
 
-        ColorsTable { primary, primary_dark, accent, control_normal, control_highlight }
+        ColorsTable {
+            primary,
+            primary_dark,
+            accent,
+            control_normal,
+            control_highlight,
+        }
     } else {
         ColorsTable {
             primary: "ff008dcd".to_string(),
             primary_dark: "ff0084c2".to_string(),
             accent: "ff008dcd".to_string(),
             control_normal: "ff57beee".to_string(),
-            control_highlight: "20008dcd".to_string()
+            control_highlight: "20008dcd".to_string(),
         }
     };
 
     let libraries = {
-        let inp =
-            input("Enabled libraries? [compat firebase admob googlemap]", "")?;
+        let inp = input("Enabled libraries? [compat firebase admob googlemap]", "")?;
         let chosen_libraries: Vec<&str> = inp.split(" ").collect();
 
         if chosen_libraries.contains(&"firebase") || chosen_libraries.contains(&"googlemap") {
@@ -63,41 +66,50 @@ pub fn exec(args: &ArgMatches) -> Result<()> {
         }
 
         LibraryTable {
-            compat: chosen_libraries.contains(&"compat")
+            compat: chosen_libraries
+                .contains(&"compat")
                 .then(|| CompatLibraryTable { enabled: true }),
 
-            firebase: invert::<_, anyhow::Error>(
-                chosen_libraries.contains(&"firebase")
-                    .then(|| Ok(FirebaseLibraryTable {
+            firebase: invert::<_, anyhow::Error>(chosen_libraries.contains(&"firebase").then(
+                || {
+                    Ok(FirebaseLibraryTable {
                         enabled: true,
                         project_id: input(" [firebase] Project id: ", "")?,
                         app_id: input(" [firebase] App id: ", "")?,
                         api_key: input(" [firebase] Api key:", "")?,
-                        storage_bucket: input(" [firebase] Storage bucket: ", "")?
-                    }))
-            )?,
+                        storage_bucket: input(" [firebase] Storage bucket: ", "")?,
+                    })
+                },
+            ))?,
 
-            admob: chosen_libraries.contains(&"admob").then(|| AdMobLibraryTable {
-                enabled: true,
-                ad_units: Default::default(), // todo
-                test_devices: vec![] // todo
-            }),
-
-            google_map: invert::<_, anyhow::Error>(
-                chosen_libraries.contains(&"googlemap").then(|| Ok(GoogleMapLibraryTable {
+            admob: chosen_libraries
+                .contains(&"admob")
+                .then(|| AdMobLibraryTable {
                     enabled: true,
-                    api_key: input(" [googlemap] Api key:", "")?
-                }))
-            )?
+                    ad_units: Default::default(), // todo
+                    test_devices: vec![],         // todo
+                }),
+
+            google_map: invert::<_, anyhow::Error>(chosen_libraries.contains(&"googlemap").then(
+                || {
+                    Ok(GoogleMapLibraryTable {
+                        enabled: true,
+                        api_key: input(" [googlemap] Api key:", "")?,
+                    })
+                },
+            ))?,
         }
     };
 
     // now we construct the manifest
     let mut activities = HashMap::new();
-    activities.insert("main".to_string(), ActivityTable {
-        logic: "main.logic".to_string(),
-        layout: "layout.logic".to_string()
-    });
+    activities.insert(
+        "main".to_string(),
+        ActivityTable {
+            logic: "main.logic".to_string(),
+            layout: "layout.logic".to_string(),
+        },
+    );
 
     let now = Utc::now();
     let manifest = toml::to_string(&Manifest {
@@ -112,22 +124,22 @@ pub fn exec(args: &ArgMatches) -> Result<()> {
                 date: Some(Date {
                     year: now.year() as u16,
                     month: now.month() as u8,
-                    day: now.day() as u8
+                    day: now.day() as u8,
                 }),
                 time: Some(Time {
                     hour: now.hour() as u8,
                     minute: now.minute() as u8,
                     second: now.second() as u8,
-                    nanosecond: now.nanosecond()
+                    nanosecond: now.nanosecond(),
                 }),
                 // might want to add offset for better accuracy, idk tho
-                offset: None
+                offset: None,
             },
             sw_ver: 150,
-            colors: Some(palette)
+            colors: Some(palette),
         },
         activity: activities,
-        library: Some(libraries)
+        library: Some(libraries),
     })?;
 
     // we now do file operation funsies
@@ -140,12 +152,12 @@ pub fn exec(args: &ArgMatches) -> Result<()> {
     // write the files and boom! we're done!
     fs::write(
         Path::new(&format!("{}/src/main.logic", folder_name)),
-        include_str!("res/main_template.logic")
+        include_str!("res/main_template.logic"),
     )?;
 
     fs::write(
         Path::new(&format!("{}/src/main.layout", folder_name)),
-        include_str!("res/main_template.layout")
+        include_str!("res/main_template.layout"),
     )?;
 
     println!("\n## Project generated into folder {}/ ##", folder_name);
@@ -155,7 +167,11 @@ pub fn exec(args: &ArgMatches) -> Result<()> {
 }
 
 fn input(prompt: &str, default: &str) -> Result<String> {
-    print!("{} ({}) ", prompt, if default.len() == 0 { "empty" } else { default });
+    print!(
+        "{} ({}) ",
+        prompt,
+        if default.len() == 0 { "empty" } else { default }
+    );
     stdout().flush()?;
 
     let mut input = String::new();
@@ -163,7 +179,11 @@ fn input(prompt: &str, default: &str) -> Result<String> {
 
     input = input.trim().to_string();
 
-    Ok(if input.len() == 0 { default.to_string() } else { input })
+    Ok(if input.len() == 0 {
+        default.to_string()
+    } else {
+        input
+    })
 }
 
 // flips an Option<Result<T, E>> to Result<Option<T>, E>

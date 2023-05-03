@@ -11,10 +11,10 @@ number a
 onCreate {
     a = 10
 }
-"#.trim();
+"#
+    .trim();
 
-    let ast = parse_logic(code)
-        .expect("failed to parse code");
+    let ast = parse_logic(code).expect("failed to parse code");
 
     println!("{:?}", ast);
 }
@@ -32,10 +32,10 @@ onCreate {
     func("hi", 4.4, 5)
     s.push("something")
 }
-"#.trim();
+"#
+    .trim();
 
-    let ast = parse_logic(code)
-        .expect("failed to parse code");
+    let ast = parse_logic(code).expect("failed to parse code");
 
     println!("{:?}", ast);
 }
@@ -57,10 +57,10 @@ button1.onClick {
     toast("hello world")
     returning_function().access.something[index].another
 }
-"#.trim();
+"#
+    .trim();
 
-    let ast = parse_logic(code)
-        .expect("failed to parse code");
+    let ast = parse_logic(code).expect("failed to parse code");
 
     println!("{:?}", ast);
 }
@@ -79,10 +79,10 @@ onCreate {
     }
     stuff()
 }
-"#.trim();
+"#
+    .trim();
 
-    let ast = parse_logic(code)
-        .expect("failed to parse code");
+    let ast = parse_logic(code).expect("failed to parse code");
 
     println!("{:?}", ast);
 }
@@ -99,10 +99,10 @@ onCreate {
     }
     toast("r")
 }
-"#.trim();
+"#
+    .trim();
 
-    let ast = parse_logic(code)
-        .expect("failed to parse code");
+    let ast = parse_logic(code).expect("failed to parse code");
 
     println!("{:?}", ast);
 }
@@ -123,10 +123,10 @@ onCreate {
     }
     stuff()
 }
-"#.trim();
+"#
+    .trim();
 
-    let ast = parse_logic(code)
-        .expect("failed to parse code");
+    let ast = parse_logic(code).expect("failed to parse code");
 
     println!("{:?}", ast);
 }

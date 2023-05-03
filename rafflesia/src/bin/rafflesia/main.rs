@@ -1,7 +1,7 @@
-use std::process::{ExitCode, Termination};
-use anyhow::{Result, Context};
+use anyhow::{Context, Result};
 use clap::{AppSettings, Command};
 use console::style;
+use std::process::{ExitCode, Termination};
 
 mod commands;
 
@@ -29,10 +29,9 @@ fn main() -> ExitCode {
         eprintln!("\n{} {}", style("error:").bold().red(), err);
         eprintln!();
         eprintln!("Caused by:");
-        err.chain().skip(1)
-            .for_each(|err_item| {
-                eprintln!("    {}", err_item);
-            });
+        err.chain().skip(1).for_each(|err_item| {
+            eprintln!("    {}", err_item);
+        });
         eprintln!();
 
         ExitCode::FAILURE

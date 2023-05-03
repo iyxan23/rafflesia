@@ -1,6 +1,11 @@
-use chumsky::{prelude::*, input::{Stream, ValueInput}};
+use chumsky::{
+    input::{Stream, ValueInput},
+    prelude::*,
+};
 use logos::Logos;
-use swrs::api::block::{BlockCategory, BlockContent, BlockType, ArgumentBlockReturnType, BlockControl};
+use swrs::api::block::{
+    ArgumentBlockReturnType, BlockCategory, BlockContent, BlockControl, BlockType,
+};
 
 mod tests;
 
@@ -18,81 +23,109 @@ pub struct BlockDefinition {
 }
 
 /// Parses a `.blks` code into [`BlockDefinitions`]
-pub fn parse_blks<'src>(raw: &'src str)
-    -> Result<BlockDefinitions, Vec<Rich<'src, Token<'src>, SimpleSpan>>> {
-
+pub fn parse_blks<'src>(
+    raw: &'src str,
+) -> Result<BlockDefinitions, Vec<Rich<'src, Token<'src>, SimpleSpan>>> {
     let lex = Token::lexer(raw)
         .spanned()
         .map(|(tok, span)| (tok, span.into()));
 
-    let stream = Stream::from_iter(lex)
-        .spanned((raw.len()..raw.len()).into());
+    let stream = Stream::from_iter(lex).spanned((raw.len()..raw.len()).into());
 
     parser().parse(stream).into_result()
 }
 
 #[derive(Logos, PartialEq, Debug, Clone)]
 pub enum Token<'src> {
-    #[token("var")] CategoryVariable,
-    #[token("list")] CategoryList,
-    #[token("control")] CategoryControl,
-    #[token("operator")] CategoryOperator,
-    #[token("math")] CategoryMath,
-    #[token("file")] CategoryFile,
-    #[token("view")] CategoryView,
-    #[token("component")] CategoryComponent,
-    #[token("moreblock")] CategoryMoreblock,
-    
+    #[token("var")]
+    CategoryVariable,
+    #[token("list")]
+    CategoryList,
+    #[token("control")]
+    CategoryControl,
+    #[token("operator")]
+    CategoryOperator,
+    #[token("math")]
+    CategoryMath,
+    #[token("file")]
+    CategoryFile,
+    #[token("view")]
+    CategoryView,
+    #[token("component")]
+    CategoryComponent,
+    #[token("moreblock")]
+    CategoryMoreblock,
+
     // Block return types
-    #[token("b")] TypeBoolean,
-    #[token("s")] TypeString,
-    #[token("d")] TypeNumber,
-    #[token("l")] TypeList, // any list
-    #[token("p")] TypeComponent,
-    #[token("v")] TypeView, // any view
-    #[token("c")] TypeSingleNested,
-    #[token("e")] TypeDoubleNested,
-    #[token("f")] TypeEnding,
+    #[token("b")]
+    TypeBoolean,
+    #[token("s")]
+    TypeString,
+    #[token("d")]
+    TypeNumber,
+    #[token("l")]
+    TypeList, // any list
+    #[token("p")]
+    TypeComponent,
+    #[token("v")]
+    TypeView, // any view
+    #[token("c")]
+    TypeSingleNested,
+    #[token("e")]
+    TypeDoubleNested,
+    #[token("f")]
+    TypeEnding,
 
-    #[token("(")] LParen,
-    #[token(")")] RParen,
-    #[token("[")] LBracket,
-    #[token("]")] RBracket,
+    #[token("(")]
+    LParen,
+    #[token(")")]
+    RParen,
+    #[token("[")]
+    LBracket,
+    #[token("]")]
+    RBracket,
 
-    #[token(":")] Colon,
-    #[token(";")] Semicolon,
+    #[token(":")]
+    Colon,
+    #[token(";")]
+    Semicolon,
 
     #[regex(r#""(?:[^"]|\\")*""#, |lex| {
         // remove the `""` around the string
         let slice = lex.slice();
         &slice[1..slice.len() - 1]
-    })] String(&'src str),
+    })]
+    String(&'src str),
 
     #[regex(r#"`(?:[^`]|\\`)*`"#, |lex| {
         // remove the ` around the string
         let slice = lex.slice();
         &slice[1..slice.len() - 1]
     })]
-    #[regex(r"([a-zA-Z_][a-zA-Z0-9_]*)")] Identifier(&'src str),
+    #[regex(r"([a-zA-Z_][a-zA-Z0-9_]*)")]
+    Identifier(&'src str),
 
     #[error]
     #[regex(r"[ \t\n]+", logos::skip)] // whitespace
     #[regex(r"//[^\n]*\n?", logos::skip)] // comment
-    Error
+    Error,
 }
 
-fn parser<'src, I: ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>>()
-    -> impl Parser<'src, I, BlockDefinitions, extra::Err<Rich<'src, Token<'src>>>> {
+fn parser<'src, I: ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>>(
+) -> impl Parser<'src, I, BlockDefinitions, extra::Err<Rich<'src, Token<'src>>>> {
     let definition = category()
         .then(opcode())
         .then(typ().or_not())
         .then_ignore(just(Token::Colon))
         .then(select! { Token::String(str) => str })
-
         .map(|(((category, opcode), typ), content)| (category, opcode, typ, content))
         .try_map(|(category, opcode, typ, content), span| {
-            Ok((category, opcode, typ, BlockContent::parse_wo_params(content)
-                .map_err(|err| Rich::custom(span, err.to_string()))?
+            Ok((
+                category,
+                opcode,
+                typ,
+                BlockContent::parse_wo_params(content)
+                    .map_err(|err| Rich::custom(span, err.to_string()))?,
             ))
         });
 
@@ -100,9 +133,7 @@ fn parser<'src, I: ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>>()
     empty()
         .map(|_| Vec::<BlockDefinition>::new())
         .foldl(
-            definition
-                .then_ignore(just(Token::Semicolon))
-                .repeated(),
+            definition.then_ignore(just(Token::Semicolon)).repeated(),
             |mut acc, (category, opcode, typ, content)| {
                 acc.push(BlockDefinition {
                     block_type: typ.unwrap_or(BlockType::Regular),
@@ -111,12 +142,13 @@ fn parser<'src, I: ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>>()
                     spec: content,
                 });
                 acc
-            })
-            .map(BlockDefinitions)
+            },
+        )
+        .map(BlockDefinitions)
 }
 
-fn typ<'src, I: ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>>()
-    -> impl Parser<'src, I, BlockType, extra::Err<Rich<'src, Token<'src>>>> {
+fn typ<'src, I: ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>>(
+) -> impl Parser<'src, I, BlockType, extra::Err<Rich<'src, Token<'src>>>> {
     select! {
         Token::TypeBoolean => BlockType::Argument(ArgumentBlockReturnType::Boolean),
         Token::TypeNumber => BlockType::Argument(ArgumentBlockReturnType::Number),
@@ -129,26 +161,27 @@ fn typ<'src, I: ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>>()
     }.delimited_by(just(Token::LParen), just(Token::RParen))
 }
 
-fn opcode<'src, I: ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>>()
-    -> impl Parser<'src, I, &'src str, extra::Err<Rich<'src, Token<'src>>>> {
+fn opcode<'src, I: ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>>(
+) -> impl Parser<'src, I, &'src str, extra::Err<Rich<'src, Token<'src>>>> {
     select! {
         Token::Identifier(ident) => ident,
     }
 }
 
-fn category<'src, I: ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>>()
-    -> impl Parser<'src, I, BlockCategory, extra::Err<Rich<'src, Token<'src>>>> {
+fn category<'src, I: ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>>(
+) -> impl Parser<'src, I, BlockCategory, extra::Err<Rich<'src, Token<'src>>>> {
     choice((
         just(Token::CategoryComponent).to(BlockCategory::ComponentFunc),
-        just(Token::CategoryControl  ).to(BlockCategory::Control),
-        just(Token::CategoryFile     ).to(BlockCategory::File),
-        just(Token::CategoryList     ).to(BlockCategory::List),
-        just(Token::CategoryMath     ).to(BlockCategory::Math),
+        just(Token::CategoryControl).to(BlockCategory::Control),
+        just(Token::CategoryFile).to(BlockCategory::File),
+        just(Token::CategoryList).to(BlockCategory::List),
+        just(Token::CategoryMath).to(BlockCategory::Math),
         just(Token::CategoryMoreblock).to(BlockCategory::MoreBlock),
-        just(Token::CategoryOperator ).to(BlockCategory::Operator),
-        just(Token::CategoryVariable ).to(BlockCategory::Variable),
-        just(Token::CategoryView     ).to(BlockCategory::ViewFunc),
-    )).delimited_by(just(Token::LBracket), just(Token::RBracket))
+        just(Token::CategoryOperator).to(BlockCategory::Operator),
+        just(Token::CategoryVariable).to(BlockCategory::Variable),
+        just(Token::CategoryView).to(BlockCategory::ViewFunc),
+    ))
+    .delimited_by(just(Token::LBracket), just(Token::RBracket))
 }
 
 // fn category<'src>() -> impl Parser<'src, &'src Token, BlockCategory, Rich<'src, Token>> {
@@ -158,10 +191,10 @@ fn category<'src, I: ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>>()
 //         text::keyword("file"     ).to(BlockCategory::File),
 //         text::keyword("list"     ).to(BlockCategory::List),
 //         text::keyword("math"     ).to(BlockCategory::Math),
-//         text::keyword("moreblock").to(BlockCategory::MoreBlock), 
-//         text::keyword("operator" ).to(BlockCategory::Operator), 
-//         text::keyword("variable" ).to(BlockCategory::Variable), 
-//         text::keyword("view"     ).to(BlockCategory::ViewFunc), 
+//         text::keyword("moreblock").to(BlockCategory::MoreBlock),
+//         text::keyword("operator" ).to(BlockCategory::Operator),
+//         text::keyword("variable" ).to(BlockCategory::Variable),
+//         text::keyword("view"     ).to(BlockCategory::ViewFunc),
 //     )).padded()
 //         .delimited_by(just('['), just(']'))
 // }

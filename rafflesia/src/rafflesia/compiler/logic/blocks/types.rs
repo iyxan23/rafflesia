@@ -1,13 +1,16 @@
+use lazy_static::__Deref;
 use lazy_static::lazy_static;
-use thiserror::Error;
-use swrs::api::block::{Argument, ArgumentBlockReturnType, ArgValue, Block, BlockCategory, BlockContent, BlockType, ListItem};
 use std::collections::HashMap;
 use std::str::FromStr;
+use swrs::api::block::{
+    ArgValue, Argument, ArgumentBlockReturnType, Block, BlockCategory, BlockContent, BlockType,
+    ListItem,
+};
 use swrs::api::view::{View, ViewType as SWRSViewType};
-use swrs::LinkedHashMap;
-use lazy_static::__Deref;
-use swrs::parser::logic::variable::{Variable as SWRSVariable, VariableType as SWRSVariableType};
 use swrs::parser::logic::list_variable::ListVariable as SWRSListVariable;
+use swrs::parser::logic::variable::{Variable as SWRSVariable, VariableType as SWRSVariableType};
+use swrs::LinkedHashMap;
+use thiserror::Error;
 
 // A type
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
@@ -21,19 +24,36 @@ pub enum Type {
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 pub enum PrimitiveType {
-    Number, String, Boolean,
+    Number,
+    String,
+    Boolean,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 pub enum ComplexType {
     List { inner_type: PrimitiveType }, // todo: restrict to only Number and String
-    Map // todo: map
+    Map,                                // todo: map
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 pub enum ViewType {
-    LinearLayout, ScrollView, Button, TextView, EditText, ImageView, WebView, ProgressBar, ListView,
-    Spinner, CheckBox, Switch, SeekBar, CalendarView, Fab, AdView, MapView
+    LinearLayout,
+    ScrollView,
+    Button,
+    TextView,
+    EditText,
+    ImageView,
+    WebView,
+    ProgressBar,
+    ListView,
+    Spinner,
+    CheckBox,
+    Switch,
+    SeekBar,
+    CalendarView,
+    Fab,
+    AdView,
+    MapView,
 }
 
 impl FromStr for ViewType {
@@ -41,16 +61,24 @@ impl FromStr for ViewType {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(match s {
-            "LinearLayout" => ViewType::LinearLayout, "ScrollView" => ViewType::ScrollView,
-            "Button" => ViewType::Button, "TextView" => ViewType::TextView,
-            "EditText" => ViewType::EditText, "ImageView" => ViewType::ImageView,
-            "WebView" => ViewType::WebView, "ProgressBar" => ViewType::ProgressBar,
-            "ListView" => ViewType::ListView, "Spinner" => ViewType::Spinner,
-            "CheckBox" => ViewType::CheckBox, "Switch" => ViewType::Switch,
-            "SeekBar" => ViewType::SeekBar, "CalendarView" => ViewType::CalendarView,
+            "LinearLayout" => ViewType::LinearLayout,
+            "ScrollView" => ViewType::ScrollView,
+            "Button" => ViewType::Button,
+            "TextView" => ViewType::TextView,
+            "EditText" => ViewType::EditText,
+            "ImageView" => ViewType::ImageView,
+            "WebView" => ViewType::WebView,
+            "ProgressBar" => ViewType::ProgressBar,
+            "ListView" => ViewType::ListView,
+            "Spinner" => ViewType::Spinner,
+            "CheckBox" => ViewType::CheckBox,
+            "Switch" => ViewType::Switch,
+            "SeekBar" => ViewType::SeekBar,
+            "CalendarView" => ViewType::CalendarView,
             "Fab" => ViewType::Fab, // "Fab" might not be valid as a typename
-            "AdView" => ViewType::AdView, "MapView" => ViewType::MapView,
-            _ => return Err(())
+            "AdView" => ViewType::AdView,
+            "MapView" => ViewType::MapView,
+            _ => return Err(()),
         })
     }
 }
@@ -58,16 +86,25 @@ impl FromStr for ViewType {
 impl ToString for ViewType {
     fn to_string(&self) -> String {
         match self {
-            ViewType::LinearLayout => "LinearLayout", ViewType::ScrollView => "ScrollView",
-            ViewType::Button => "Button", ViewType::TextView => "TextView",
-            ViewType::EditText => "EditText", ViewType::ImageView => "ImageView",
-            ViewType::WebView => "WebView", ViewType::ProgressBar => "ProgressBar",
-            ViewType::ListView => "ListView", ViewType::Spinner => "Spinner",
-            ViewType::CheckBox => "CheckBox", ViewType::Switch => "Switch",
-            ViewType::SeekBar => "SeekBar", ViewType::CalendarView => "CalendarView",
+            ViewType::LinearLayout => "LinearLayout",
+            ViewType::ScrollView => "ScrollView",
+            ViewType::Button => "Button",
+            ViewType::TextView => "TextView",
+            ViewType::EditText => "EditText",
+            ViewType::ImageView => "ImageView",
+            ViewType::WebView => "WebView",
+            ViewType::ProgressBar => "ProgressBar",
+            ViewType::ListView => "ListView",
+            ViewType::Spinner => "Spinner",
+            ViewType::CheckBox => "CheckBox",
+            ViewType::Switch => "Switch",
+            ViewType::SeekBar => "SeekBar",
+            ViewType::CalendarView => "CalendarView",
             ViewType::Fab => "Fab", // "Fab" might not be valid as a typename
-            ViewType::AdView => "AdView", ViewType::MapView => "MapView",
-        }.to_string()
+            ViewType::AdView => "AdView",
+            ViewType::MapView => "MapView",
+        }
+        .to_string()
     }
 }
 
@@ -91,7 +128,7 @@ impl ViewType {
             SWRSViewType::CalendarView { .. } => ViewType::CalendarView,
             SWRSViewType::Fab { .. } => ViewType::Fab,
             SWRSViewType::AdView { .. } => ViewType::AdView,
-            SWRSViewType::MapView => ViewType::MapView
+            SWRSViewType::MapView => ViewType::MapView,
         }
     }
 }
@@ -107,45 +144,47 @@ impl Type {
             ArgumentBlockReturnType::Number => Type::Primitive(PrimitiveType::Number),
             ArgumentBlockReturnType::String => Type::Primitive(PrimitiveType::String),
             ArgumentBlockReturnType::Boolean => Type::Primitive(PrimitiveType::Boolean),
-            ArgumentBlockReturnType::List { inner_type } =>
-                Type::Complex(ComplexType::List {
-                    inner_type: match inner_type {
-                        ListItem::String => PrimitiveType::String,
-                        ListItem::Number => PrimitiveType::Number
-                    }
-                }),
+            ArgumentBlockReturnType::List { inner_type } => Type::Complex(ComplexType::List {
+                inner_type: match inner_type {
+                    ListItem::String => PrimitiveType::String,
+                    ListItem::Number => PrimitiveType::Number,
+                },
+            }),
 
-            ArgumentBlockReturnType::View { type_name } =>
-                Type::View(ViewType::from_str(type_name).ok()?),
+            ArgumentBlockReturnType::View { type_name } => {
+                Type::View(ViewType::from_str(type_name).ok()?)
+            }
 
             ArgumentBlockReturnType::Component { type_name } =>
-                // Type::Component(ComponentType::from_str(&type_name).ok?)
-                todo!("components"),
+            // Type::Component(ComponentType::from_str(&type_name).ok?)
+            {
+                todo!("components")
+            }
         })
     }
 
     pub fn to_arg_block_type(&self) -> ArgumentBlockReturnType {
         match self {
             Type::Void => unreachable!(),
-            Type::Primitive(PrimitiveType::Number) =>
-                ArgumentBlockReturnType::Number,
-            Type::Primitive(PrimitiveType::Boolean) =>
-                ArgumentBlockReturnType::Boolean,
-            Type::Primitive(PrimitiveType::String) =>
-                ArgumentBlockReturnType::String,
-            Type::Complex(ComplexType::List { inner_type }) =>
-                ArgumentBlockReturnType::List {
-                    inner_type: match inner_type {
-                        PrimitiveType::Number => ListItem::Number,
-                        PrimitiveType::String => ListItem::String,
-                        PrimitiveType::Boolean => unreachable!(),
-                    }
+            Type::Primitive(PrimitiveType::Number) => ArgumentBlockReturnType::Number,
+            Type::Primitive(PrimitiveType::Boolean) => ArgumentBlockReturnType::Boolean,
+            Type::Primitive(PrimitiveType::String) => ArgumentBlockReturnType::String,
+            Type::Complex(ComplexType::List { inner_type }) => ArgumentBlockReturnType::List {
+                inner_type: match inner_type {
+                    PrimitiveType::Number => ListItem::Number,
+                    PrimitiveType::String => ListItem::String,
+                    PrimitiveType::Boolean => unreachable!(),
                 },
+            },
             Type::Complex(ComplexType::Map) => todo!("map"),
             Type::View(view) =>
-                // fixme: uhhh i think this might not work on some views
-                ArgumentBlockReturnType::View { type_name: view.to_string() },
-            Type::Component(_) => todo!("components")
+            // fixme: uhhh i think this might not work on some views
+            {
+                ArgumentBlockReturnType::View {
+                    type_name: view.to_string(),
+                }
+            }
+            Type::Component(_) => todo!("components"),
         }
     }
 }
@@ -157,10 +196,21 @@ pub enum TypeValue {
     String(ArgValue<String>),
     Boolean(ArgValue<super::Boolean>),
 
-    List { inner_type: PrimitiveType, var_name: ArgValue<String> },
-    Map { var_name: ArgValue<String> }, // todo: map
-    View { view_type: ViewType, id: ArgValue<String> },
-    Component { component_type: ComponentType, id: ArgValue<String> }
+    List {
+        inner_type: PrimitiveType,
+        var_name: ArgValue<String>,
+    },
+    Map {
+        var_name: ArgValue<String>,
+    }, // todo: map
+    View {
+        view_type: ViewType,
+        id: ArgValue<String>,
+    },
+    Component {
+        component_type: ComponentType,
+        id: ArgValue<String>,
+    },
 }
 
 impl TypeValue {
@@ -169,7 +219,9 @@ impl TypeValue {
             TypeValue::Number(_) => Type::Primitive(PrimitiveType::Number),
             TypeValue::String(_) => Type::Primitive(PrimitiveType::String),
             TypeValue::Boolean(_) => Type::Primitive(PrimitiveType::Boolean),
-            TypeValue::List { inner_type, .. } => Type::Complex(ComplexType::List { inner_type: *inner_type }),
+            TypeValue::List { inner_type, .. } => Type::Complex(ComplexType::List {
+                inner_type: *inner_type,
+            }),
             TypeValue::Map { .. } => Type::Complex(ComplexType::Map),
             TypeValue::View { view_type, .. } => Type::View(*view_type),
             TypeValue::Component { component_type, .. } => Type::Component(*component_type),
@@ -229,14 +281,18 @@ impl<'a> Definitions<'a> {
     pub fn new(layout_ref: &'a View) -> Self {
         Self {
             variables: Default::default(),
-            layout_ref
+            layout_ref,
         }
     }
 
     // returns None when the variable name is already used
     pub fn add_variable(&mut self, name: String, typ: Type) -> Option<String> {
-        if self.variables.contains_key(&name) { return None; }
-        if self.layout_ref.find_id(&name).is_some() { return None; }
+        if self.variables.contains_key(&name) {
+            return None;
+        }
+        if self.layout_ref.find_id(&name).is_some() {
+            return None;
+        }
 
         self.variables.insert(name.clone(), typ);
 
@@ -244,9 +300,11 @@ impl<'a> Definitions<'a> {
     }
 
     pub fn get_var(&self, name: &str) -> Option<Type> {
-        if let Some(var) = self.variables.get(name) { return Some(*var); }
+        if let Some(var) = self.variables.get(name) {
+            return Some(*var);
+        }
         if let Some(View { view: Ok(view), .. }) = self.layout_ref.find_id(name) {
-            return Some(Type::View(ViewType::from_swrs_view(view)))
+            return Some(Type::View(ViewType::from_swrs_view(view)));
         }
 
         None
@@ -258,12 +316,16 @@ impl<'a> Definitions<'a> {
             Type::Primitive(PrimitiveType::String) => None, // todo
             Type::Primitive(PrimitiveType::Number) => Some(super::NUMBER_TYPE_DATA.deref()),
             Type::Primitive(PrimitiveType::Boolean) => None, // todo
-            Type::Complex(ComplexType::Map) => None, // todo
-            Type::Complex(ComplexType::List { inner_type: PrimitiveType::String }) => None, // todo
-            Type::Complex(ComplexType::List { inner_type: PrimitiveType::Number }) => None, // todo
-            Type::View(_) => None, // todo
-            Type::Component(_) => None, // todo
-            _ => panic!("list cant have bool inner type")
+            Type::Complex(ComplexType::Map) => None,         // todo
+            Type::Complex(ComplexType::List {
+                inner_type: PrimitiveType::String,
+            }) => None, // todo
+            Type::Complex(ComplexType::List {
+                inner_type: PrimitiveType::Number,
+            }) => None, // todo
+            Type::View(_) => None,                           // todo
+            Type::Component(_) => None,                      // todo
+            _ => panic!("list cant have bool inner type"),
         }
     }
 
@@ -271,8 +333,12 @@ impl<'a> Definitions<'a> {
         GLOBAL_FUNCTIONS.get(name)
     }
 
-    pub fn deconstruct(self)
-        -> (LinkedHashMap<String, SWRSVariable>, LinkedHashMap<String, SWRSListVariable>) {
+    pub fn deconstruct(
+        self,
+    ) -> (
+        LinkedHashMap<String, SWRSVariable>,
+        LinkedHashMap<String, SWRSListVariable>,
+    ) {
         let mut variables = LinkedHashMap::new();
         let mut list_variables = LinkedHashMap::new();
 
@@ -287,8 +353,8 @@ impl<'a> Definitions<'a> {
                                 PrimitiveType::Number => SWRSVariableType::Integer,
                                 PrimitiveType::String => SWRSVariableType::String,
                                 PrimitiveType::Boolean => SWRSVariableType::Boolean,
-                            }
-                        }
+                            },
+                        },
                     );
                 }
 
@@ -300,15 +366,16 @@ impl<'a> Definitions<'a> {
                             r#type: match inner_type {
                                 PrimitiveType::Number => SWRSVariableType::Integer,
                                 PrimitiveType::String => SWRSVariableType::String,
-                                PrimitiveType::Boolean =>
+                                PrimitiveType::Boolean => {
                                     panic!("ComplexType::List cannot have a boolean inner type")
-                            }
-                        }
+                                }
+                            },
+                        },
                     );
                 }
 
                 Type::Complex(ComplexType::Map) => todo!(),
-                _ => ()
+                _ => (),
             }
         }
 
@@ -332,19 +399,21 @@ pub enum Member {
 
 impl Member {
     pub fn new_method(
-        arg_types: Vec<Type>, ret_type: Type, gen: fn(TypeValue, Vec<TypeValue>) -> Block
+        arg_types: Vec<Type>,
+        ret_type: Type,
+        gen: fn(TypeValue, Vec<TypeValue>) -> Block,
     ) -> Member {
         Member::Method {
             arg_types,
             generate: gen,
-            return_type: ret_type
+            return_type: ret_type,
         }
     }
 
     pub fn new_field(ret_type: Type, gen: fn(TypeValue) -> Block) -> Member {
         Member::Field {
             generate: gen,
-            return_type: ret_type
+            return_type: ret_type,
         }
     }
 
@@ -354,16 +423,15 @@ impl Member {
             arg_types: method_arg_types,
             generate,
             ..
-        } = self {
-            let args_types = args.iter()
-                .map(|arg| arg.as_type())
-                .collect::<Vec<Type>>();
+        } = self
+        {
+            let args_types = args.iter().map(|arg| arg.as_type()).collect::<Vec<Type>>();
 
             if method_arg_types.len() != args_types.len() {
                 return Err(GenerateError::InvalidArgumentCount {
                     expected: method_arg_types.clone(),
-                    got: args_types
-                })
+                    got: args_types,
+                });
             }
 
             // check if the parameter types have the same types as the argument types
@@ -373,21 +441,23 @@ impl Member {
                         expected: method_arg_types.into_iter().cloned().collect(),
                         got: args_types,
                         index,
-                    })
+                    });
                 }
             }
 
             Ok((generate)(val, args))
-        } else { panic!("not a method") }
+        } else {
+            panic!("not a method")
+        }
     }
 
     pub fn field_gen(&self, value: TypeValue) -> Result<Block, GenerateError> {
         // make sure its a method
-        if let Member::Field {
-            generate, ..
-        } = self {
+        if let Member::Field { generate, .. } = self {
             Ok((generate)(value))
-        } else { panic!("not a field") }
+        } else {
+            panic!("not a field")
+        }
     }
 }
 
@@ -412,21 +482,19 @@ pub struct GlobalFunction {
     pub name: String,
     pub return_type: Type,
     pub argument_types: Vec<Type>,
-    generate: fn(Vec<TypeValue>) -> Block
+    generate: fn(Vec<TypeValue>) -> Block,
 }
 
 impl GlobalFunction {
     pub fn generate(&self, args: Vec<TypeValue>) -> Result<Block, GenerateError> {
-        let args_types = args.iter()
-            .map(|arg| arg.as_type())
-            .collect::<Vec<Type>>();
+        let args_types = args.iter().map(|arg| arg.as_type()).collect::<Vec<Type>>();
 
         // kind of a safety wrapper that checks if the args are valid
         if args_types.len() != self.argument_types.len() {
             return Err(GenerateError::InvalidArgumentCount {
                 expected: self.argument_types.clone(),
-                got: args_types
-            })
+                got: args_types,
+            });
         }
 
         // check for every types
@@ -436,8 +504,8 @@ impl GlobalFunction {
                 return Err(GenerateError::InvalidArgumentType {
                     expected: self.argument_types.clone(),
                     got: args_types.clone(),
-                    index
-                })
+                    index,
+                });
             }
         }
 
@@ -449,10 +517,7 @@ impl GlobalFunction {
 #[derive(Debug, Error, Clone)]
 pub enum GenerateError {
     #[error("invalid arguments given: expected {} total arguments, got {}", .expected.len(), .got.len())]
-    InvalidArgumentCount {
-        expected: Vec<Type>,
-        got: Vec<Type>
-    },
+    InvalidArgumentCount { expected: Vec<Type>, got: Vec<Type> },
 
     #[error(
         "invalid {}th argument type given: expected {:?}, got {:?}",
@@ -461,7 +526,7 @@ pub enum GenerateError {
     InvalidArgumentType {
         expected: Vec<Type>,
         got: Vec<Type>,
-        index: usize
+        index: usize,
     },
 }
 
@@ -503,12 +568,12 @@ fn new_func(
     name: &str,
     return_type: Type,
     argument_types: Vec<Type>,
-    generate_fn: fn(Vec<TypeValue>) -> Block
+    generate_fn: fn(Vec<TypeValue>) -> Block,
 ) -> GlobalFunction {
     GlobalFunction {
         name: name.to_string(),
         return_type,
         argument_types,
-        generate: generate_fn
+        generate: generate_fn,
     }
 }

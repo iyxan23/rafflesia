@@ -2,21 +2,26 @@ extern crate logos;
 
 use logos::Logos;
 
-use crate::{BufferedLexer, error::ParseError, SpannedTokenOwned};
+use crate::{error::ParseError, BufferedLexer, SpannedTokenOwned};
 
 #[derive(Logos, Clone, PartialEq, Debug)]
 enum Token {
-    #[token("hello")] Hello,
-    #[token("world")] World,
+    #[token("hello")]
+    Hello,
+    #[token("world")]
+    World,
 
-    #[token("foo")] Foo,
-    #[token("bar")] Bar,
+    #[token("foo")]
+    Foo,
+    #[token("bar")]
+    Bar,
 
-    #[regex(r"[a-zA-Z_][a-zA-Z0-9_]*")] Identifier,
+    #[regex(r"[a-zA-Z_][a-zA-Z0-9_]*")]
+    Identifier,
 
     #[error]
     #[regex(r"[ \t]+", logos::skip)] // whitespace
-    Error
+    Error,
 }
 
 #[inline]
@@ -48,7 +53,8 @@ fn next_fail() {
     let raw = "hello world";
     let mut lex = create(raw);
 
-    lex.next().unwrap(); lex.next().unwrap();
+    lex.next().unwrap();
+    lex.next().unwrap();
 
     let Err(ParseError::EOF { expected: None }) = lex.next() else {
         panic!("Not eof?");
@@ -67,7 +73,6 @@ fn expect() {
     assert_eq!(next.slice, "hello");
     assert_eq!(next.pos, 0..5);
     assert_eq!(lex.get_index(), 1);
-
 
     let next = lex.expect(Token::World).unwrap();
     assert_eq!(next.token, Token::World);
@@ -91,7 +96,7 @@ fn expect_fail() {
 
     assert_eq!(expected, vec![Token::World]);
     assert_eq!(slice, "hello");
-    assert_eq!(pos, 0..5); 
+    assert_eq!(pos, 0..5);
     assert_eq!(u_pos, 0..5);
 }
 
@@ -103,7 +108,9 @@ fn expect_failsafe_0() {
     assert_eq!(
         lex.expect_failsafe(Token::Hello),
         Ok(Some(crate::SpannedTokenOwned {
-            token: Token::Hello, slice: "hello".to_string(), pos: 0..5
+            token: Token::Hello,
+            slice: "hello".to_string(),
+            pos: 0..5
         }))
     )
 }
@@ -124,16 +131,16 @@ fn expect_multiple_choices() {
     for i in 1..5 {
         assert_eq!(i - 1, lex.get_index());
 
-        match lex.expect_multiple_choices(&vec![
-                    Token::Hello, Token::World, Token::Foo, Token::Bar
-                ]).unwrap() {
-
-            SpannedTokenOwned { 
+        match lex
+            .expect_multiple_choices(&vec![Token::Hello, Token::World, Token::Foo, Token::Bar])
+            .unwrap()
+        {
+            SpannedTokenOwned {
                 token: Token::Hello | Token::World | Token::Foo | Token::Bar,
                 ..
-            } => {},
+            } => {}
 
-            _ => panic!()
+            _ => panic!(),
         }
 
         assert_eq!(i, lex.get_index());
@@ -151,18 +158,24 @@ fn expect_multiple_choices_fail() {
         assert_eq!(i - 1, lex.get_index());
 
         match lex.expect_multiple_choices(&expecting) {
-
-            Ok(SpannedTokenOwned { 
+            Ok(SpannedTokenOwned {
                 token: Token::Hello | Token::World | Token::Foo,
                 ..
-            }) => {},
+            }) => {}
 
-            Ok(SpannedTokenOwned { token: Token::Bar, .. }) => panic!("got Token::Bar while not expecting it"),
+            Ok(SpannedTokenOwned {
+                token: Token::Bar, ..
+            }) => panic!("got Token::Bar while not expecting it"),
 
             Err(ParseError::UnexpectedTokenError {
                 expected: Some(expected),
-                unexpected_token: SpannedTokenOwned { token: Token::Bar, slice, pos },
-                pos: u_pos
+                unexpected_token:
+                    SpannedTokenOwned {
+                        token: Token::Bar,
+                        slice,
+                        pos,
+                    },
+                pos: u_pos,
             }) => {
                 assert_eq!(expected, expecting);
                 assert_eq!(slice, "bar");
@@ -170,7 +183,7 @@ fn expect_multiple_choices_fail() {
                 assert_eq!(u_pos, 16..19);
             }
 
-            _ => panic!()
+            _ => panic!(),
         }
 
         assert_eq!(i, lex.get_index());

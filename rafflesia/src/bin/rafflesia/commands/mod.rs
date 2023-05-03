@@ -1,13 +1,8 @@
-use clap::{ArgMatches, Command};
 use anyhow::Result;
+use clap::{ArgMatches, Command};
 
 pub fn builtin() -> Vec<Command<'static>> {
-    vec![
-        new::cli(),
-        build::cli(),
-        generate::cli(),
-        metadata::cli(),
-    ]
+    vec![new::cli(), build::cli(), generate::cli(), metadata::cli()]
 }
 
 pub fn builtin_exec(cmd: &str) -> Option<fn(&ArgMatches) -> Result<()>> {
@@ -16,11 +11,11 @@ pub fn builtin_exec(cmd: &str) -> Option<fn(&ArgMatches) -> Result<()>> {
         "build" => build::exec,
         "generate" => generate::exec,
         "metadata" => metadata::exec,
-        _ => return None
+        _ => return None,
     })
 }
 
 pub mod build;
 pub mod generate;
-pub mod new;
 pub mod metadata;
+pub mod new;

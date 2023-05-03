@@ -1,5 +1,5 @@
-use clap::{AppSettings, ArgMatches, Command};
 use anyhow::Result;
+use clap::{AppSettings, ArgMatches, Command};
 use rafflesia::ops::build;
 
 pub fn cli() -> Command<'static> {

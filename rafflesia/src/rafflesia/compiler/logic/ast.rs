@@ -30,14 +30,14 @@ pub enum OuterStatement {
 
     ActivityEventListener {
         event_name: String,
-        body: InnerStatements
+        body: InnerStatements,
     },
 
     ViewEventListener {
         view_id: String,
         event_name: String,
-        body: InnerStatements
-    }
+        body: InnerStatements,
+    },
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -46,7 +46,7 @@ pub struct InnerStatements(pub Vec<InnerStatement>);
 #[derive(Debug, PartialEq, Clone)]
 pub struct VariableAssignment {
     pub identifier: String,
-    pub value: Expression
+    pub value: Expression,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -75,7 +75,7 @@ pub enum InnerStatement {
     ForeverStatement(ForeverStatement),
     Break,
     Continue,
-    Expression(Expression)
+    Expression(Expression),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -110,10 +110,10 @@ pub enum Expression {
     },
     UnaryOp {
         value: Box<Expression>,
-        operator: UnaryOperator
+        operator: UnaryOperator,
     },
     PrimaryExpression(PrimaryExpression),
-    Literal(Literal)
+    Literal(Literal),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -142,8 +142,8 @@ pub enum PrimaryExpression {
         // from.name(arguments)
         from: Option<Box<Expression>>, // using PrimaryExpression might be better
         name: String,
-        arguments: Arguments
-    }
+        arguments: Arguments,
+    },
 }
 
 #[derive(Debug, PartialEq, Clone)]

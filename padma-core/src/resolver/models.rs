@@ -1,18 +1,18 @@
-use std::{rc::Rc, collections::HashMap};
+use std::{collections::HashMap, rc::Rc};
 
 use swrs::api::block::BlockContent;
 
-use crate::defs::{Type as DefsType, Literal as DefsLiteral};
+use crate::defs::{Literal as DefsLiteral, Type as DefsType};
 
 /// Signature of a definition.
-/// 
+///
 /// Note: Bindings are meld as function / methods.
 #[derive(Debug, Clone, PartialEq, Hash, Eq)] // <- Hash and Eq needed for HashMap
 pub enum Signature {
     Function {
         name: String,
         parameters: Vec<DefsType>,
-        return_type: Option<DefsType>
+        return_type: Option<DefsType>,
     },
     Method {
         name: String,
@@ -20,7 +20,6 @@ pub enum Signature {
         parameters: Vec<DefsType>,
         return_type: Option<DefsType>,
     },
-
     // coming soon: Expression
 }
 
@@ -30,7 +29,7 @@ pub struct Definitions {
     pub definitions: HashMap<Signature, (DefinitionBlocks, BlockReturn)>,
 }
 
-pub type DefinitionBlocks = Vec<Rc<Block>>; 
+pub type DefinitionBlocks = Vec<Rc<Block>>;
 pub type BlockReturn = Option<BlockArgument>;
 
 #[derive(Debug, Clone, PartialEq)]

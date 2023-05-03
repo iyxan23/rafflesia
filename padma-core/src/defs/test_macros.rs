@@ -53,7 +53,7 @@ methods! {
 */
 macro_rules! methods {
     {
-        $($typ:expr => 
+        $($typ:expr =>
             [$($ident:ident($($param_typ:expr),* $(,)*): $ret_typ:expr => {
                 $($stmt:expr;)*
             },)*]),* $(,)*
@@ -182,7 +182,7 @@ macro_rules! binding_body {
             name: stringify!($name).to_string(),
             arguments: Some(vec![
                 $($args,)*
-            ]) 
+            ])
         }
     };
 
@@ -230,7 +230,7 @@ macro_rules! expr {
             name: stringify!($name).to_string(),
             arguments: vec![
                 $($args,)*
-            ] 
+            ]
         }
     };
     // method
@@ -245,12 +245,22 @@ macro_rules! expr {
     };
 }
 
-macro_rules! arg { ($lit:literal) => { Expression::StaticVariable(StaticVariable::Argument($lit)) }; }
+macro_rules! arg {
+    ($lit:literal) => {
+        Expression::StaticVariable(StaticVariable::Argument($lit))
+    };
+}
 
 macro_rules! typ {
-    (b) => { Type::Boolean };
-    (d) => { Type::Number };
-    (s) => { Type::String };
+    (b) => {
+        Type::Boolean
+    };
+    (d) => {
+        Type::Number
+    };
+    (s) => {
+        Type::String
+    };
 }
 
 macro_rules! stmt {
@@ -270,7 +280,7 @@ macro_rules! stmt {
 
             arguments: vec![
                 $($args,)*
-            ] 
+            ]
         }
     };
     // method
@@ -291,4 +301,7 @@ macro_rules! stmt {
     }
 }
 
-pub(super) use {collection, typ, stmt, arg, expr, global_functions, methods, bindings, binding_func_dec, binding_method_dec, binding_body};
+pub(super) use {
+    arg, binding_body, binding_func_dec, binding_method_dec, bindings, collection, expr,
+    global_functions, methods, stmt, typ,
+};

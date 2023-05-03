@@ -1,17 +1,17 @@
+use anyhow::{bail, Context, Result};
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
-use anyhow::{bail, Context, Result};
 // use ariadne::{Label, Report, ReportBuilder, ReportKind, sources};
+use crate::compiler;
+use crate::core::manifest::ActivityTable;
+use crate::core::project::Project;
 use console::style;
 use indicatif::{ProgressBar, ProgressStyle};
 use swrs::api::screen::Screen;
 use swrs::api::SketchwareProject;
 use swrs::parser::file::{KeyboardSetting, Orientation, Theme};
 use swrs::parser::RawSketchwareProject;
-use crate::compiler;
-use crate::core::manifest::ActivityTable;
-use crate::core::project::Project;
 
 // todo: DI on printing things, to cover the usage of rafflesia (lib) as a library
 pub fn build() -> Result<()> {
@@ -30,11 +30,11 @@ pub fn build() -> Result<()> {
 
     println!("Building project {}", style(&project_name).bold().cyan());
 
-    let pb = ProgressBar::new_spinner()
-        .with_style(ProgressStyle::default_spinner()
+    let pb = ProgressBar::new_spinner().with_style(
+        ProgressStyle::default_spinner()
             .template("{spinner:.dim.bold} Building - {wide_msg}")
-            .tick_chars("/|\\- ")
-        );
+            .tick_chars("/|\\- "),
+    );
     pb.enable_steady_tick(200);
 
     // start building.. i guess?
@@ -44,14 +44,16 @@ pub fn build() -> Result<()> {
         Ok(screens) => screens,
         Err(err) => {
             pb.finish_and_clear();
-            return Err(err).context(format!("Error while building project {}", project_name))
+            return Err(err).context(format!("Error while building project {}", project_name));
         }
     };
 
     pb.set_message("Packing it all together");
 
     // build a sketchware project skeleton out of the project manifest
-    let mut sw_proj: SketchwareProject = project.manifest.try_into()
+    let mut sw_proj: SketchwareProject = project
+        .manifest
+        .try_into()
         .context("Error while parsing the manifest")?;
 
     // then set stuff
@@ -62,7 +64,8 @@ pub fn build() -> Result<()> {
 
     // we just need to reconstruct this to project files
 
-    let raw: RawSketchwareProject = sw_proj.try_into()
+    let raw: RawSketchwareProject = sw_proj
+        .try_into()
         .context("Error while constructing the raw sketchware project")?;
 
     // and we're done!!!! :D
@@ -71,25 +74,41 @@ pub fn build() -> Result<()> {
 
     let build_folder = project.working_directory.join("build");
     if build_folder.exists() {
-        fs::remove_dir_all(&build_folder)
-            .context("Failed to remove the build folder")?;
+        fs::remove_dir_all(&build_folder).context("Failed to remove the build folder")?;
     }
 
-    fs::create_dir(build_folder.as_path())
-        .context("Failed to create the build folder")?;
+    fs::create_dir(build_folder.as_path()).context("Failed to create the build folder")?;
 
-    fs::write(build_folder.join("project"), swrs::encrypt_sw(raw.project.as_bytes()))
-        .context("Failed to write ./build/project")?;
-    fs::write(build_folder.join("file"), swrs::encrypt_sw(raw.file.as_bytes()))
-        .context("Failed to write ./build/file")?;
-    fs::write(build_folder.join("library"), swrs::encrypt_sw(raw.library.as_bytes()))
-        .context("Failed to write ./build/library")?;
-    fs::write(build_folder.join("resource"), swrs::encrypt_sw(raw.resource.as_bytes()))
-        .context("Failed to write ./build/resource")?;
-    fs::write(build_folder.join("view"), swrs::encrypt_sw(raw.view.as_bytes()))
-        .context("Failed to write ./build/view")?;
-    fs::write(build_folder.join("logic"), swrs::encrypt_sw(raw.logic.as_bytes()))
-        .context("Failed to write ./build/logic")?;
+    fs::write(
+        build_folder.join("project"),
+        swrs::encrypt_sw(raw.project.as_bytes()),
+    )
+    .context("Failed to write ./build/project")?;
+    fs::write(
+        build_folder.join("file"),
+        swrs::encrypt_sw(raw.file.as_bytes()),
+    )
+    .context("Failed to write ./build/file")?;
+    fs::write(
+        build_folder.join("library"),
+        swrs::encrypt_sw(raw.library.as_bytes()),
+    )
+    .context("Failed to write ./build/library")?;
+    fs::write(
+        build_folder.join("resource"),
+        swrs::encrypt_sw(raw.resource.as_bytes()),
+    )
+    .context("Failed to write ./build/resource")?;
+    fs::write(
+        build_folder.join("view"),
+        swrs::encrypt_sw(raw.view.as_bytes()),
+    )
+    .context("Failed to write ./build/view")?;
+    fs::write(
+        build_folder.join("logic"),
+        swrs::encrypt_sw(raw.logic.as_bytes()),
+    )
+    .context("Failed to write ./build/logic")?;
 
     pb.println("Files written to build/");
     pb.finish_and_clear();
@@ -98,9 +117,10 @@ pub fn build() -> Result<()> {
     Ok(())
 }
 
-fn compile_screens(pb: &ProgressBar, activities: HashMap<String, ActivityTable>)
-    -> Result<Vec<Screen>> {
-
+fn compile_screens(
+    pb: &ProgressBar,
+    activities: HashMap<String, ActivityTable>,
+) -> Result<Vec<Screen>> {
     let mut screens = Vec::new();
 
     for (name, activity) in activities {
@@ -109,9 +129,9 @@ fn compile_screens(pb: &ProgressBar, activities: HashMap<String, ActivityTable>)
         // todo: integrate ariadne
 
         // first we parse the layout
-        let layout = fs::read_to_string(
-            Path::new("src/").join(activity.layout.as_str())
-        ).context(format!("Error while reading layout file of activity {}", name))?;
+        let layout = fs::read_to_string(Path::new("src/").join(activity.layout.as_str())).context(
+            format!("Error while reading layout file of activity {}", name),
+        )?;
 
         let parsed_layout = compiler::layout::parser::parse_layout(layout.as_str())
             .context(format!("Syntax error on {}", activity.layout))?;
@@ -179,9 +199,9 @@ fn compile_screens(pb: &ProgressBar, activities: HashMap<String, ActivityTable>)
         // then parse the logic with the provided parsed layout so the logic can access views from
         // the layout (global view access baby)
 
-        let logic = fs::read_to_string(
-            Path::new("src/").join(activity.logic.as_str())
-        ).context(format!("Error while reading logic file of activity {}", name))?;
+        let logic = fs::read_to_string(Path::new("src/").join(activity.logic.as_str())).context(
+            format!("Error while reading logic file of activity {}", name),
+        )?;
 
         let parsed_logic = compiler::logic::parser::parse_logic(logic.as_str())
             .context(format!("Syntax error on {}", activity.logic))?;
@@ -195,11 +215,11 @@ fn compile_screens(pb: &ProgressBar, activities: HashMap<String, ActivityTable>)
 
             layout: vec![view],
 
-            variables:      logic_compile_result.variables,
+            variables: logic_compile_result.variables,
             list_variables: logic_compile_result.list_variables,
-            more_blocks:    logic_compile_result.more_blocks,
-            components:     logic_compile_result.components,
-            events:         logic_compile_result.events,
+            more_blocks: logic_compile_result.more_blocks,
+            components: logic_compile_result.components,
+            events: logic_compile_result.events,
 
             fab: None, // todo: fab
 
@@ -210,7 +230,7 @@ fn compile_screens(pb: &ProgressBar, activities: HashMap<String, ActivityTable>)
             fab_enabled: false,
             orientation: Orientation::Portrait,
             theme: Theme::None,
-            keyboard_setting: KeyboardSetting::Unspecified
+            keyboard_setting: KeyboardSetting::Unspecified,
         });
     }
 

@@ -13,13 +13,13 @@
 // this file is filled with definitions that might not be used in the codebase
 #![allow(dead_code, unused_variables)]
 
-use swrs::api::block::{
-    Argument, ArgumentBlockReturnType, ArgValue, Block, BlockCategory, BlockContent, BlockControl,
-    Blocks, BlockType
-};
-use crate::compiler::logic::blocks::types::{Member, TypeData, Type, PrimitiveType};
-use std::collections::HashMap;
+use crate::compiler::logic::blocks::types::{Member, PrimitiveType, Type, TypeData};
 use lazy_static::lazy_static;
+use std::collections::HashMap;
+use swrs::api::block::{
+    ArgValue, Argument, ArgumentBlockReturnType, Block, BlockCategory, BlockContent, BlockControl,
+    BlockType, Blocks,
+};
 
 pub mod types;
 
@@ -34,7 +34,7 @@ pub fn r#break() -> Block {
         color: BlockCategory::Control.into(),
         op_code: "break".to_string(),
         content: BlockContent::builder().text("continue").build(),
-        block_type: BlockType::Control(BlockControl::EndingBlock)
+        block_type: BlockType::Control(BlockControl::EndingBlock),
     }
 }
 
@@ -45,7 +45,7 @@ pub fn r#continue() -> Block {
         color: BlockCategory::Control.into(),
         op_code: "continue".to_string(),
         content: BlockContent::builder().text("continue").build(),
-        block_type: BlockType::Control(BlockControl::EndingBlock)
+        block_type: BlockType::Control(BlockControl::EndingBlock),
     }
 }
 
@@ -59,10 +59,10 @@ pub fn not(arg: ArgValue<Boolean>) -> Block {
             .text("not")
             .arg(Argument::Boolean {
                 name: None,
-                value: arg
+                value: arg,
             })
             .build(),
-        block_type: BlockType::Regular
+        block_type: BlockType::Regular,
     }
 }
 
@@ -73,11 +73,17 @@ pub fn or(first: ArgValue<Boolean>, second: ArgValue<Boolean>) -> Block {
         color: BlockCategory::Math.into(),
         op_code: "||".to_string(),
         content: BlockContent::builder()
-            .arg(Argument::Boolean { name: None, value: first })
+            .arg(Argument::Boolean {
+                name: None,
+                value: first,
+            })
             .text("or")
-            .arg(Argument::Boolean { name: None, value: second })
+            .arg(Argument::Boolean {
+                name: None,
+                value: second,
+            })
             .build(),
-        block_type: BlockType::Argument(ArgumentBlockReturnType::Boolean)
+        block_type: BlockType::Argument(ArgumentBlockReturnType::Boolean),
     }
 }
 
@@ -88,11 +94,17 @@ pub fn and(first: ArgValue<Boolean>, second: ArgValue<Boolean>) -> Block {
         color: BlockCategory::Math.into(),
         op_code: "&&".to_string(),
         content: BlockContent::builder()
-            .arg(Argument::Boolean { name: None, value: first })
+            .arg(Argument::Boolean {
+                name: None,
+                value: first,
+            })
             .text("and")
-            .arg(Argument::Boolean { name: None, value: second })
+            .arg(Argument::Boolean {
+                name: None,
+                value: second,
+            })
             .build(),
-        block_type: BlockType::Argument(ArgumentBlockReturnType::Boolean)
+        block_type: BlockType::Argument(ArgumentBlockReturnType::Boolean),
     }
 }
 
@@ -103,21 +115,26 @@ pub fn lt(first: ArgValue<Number>, second: ArgValue<Number>) -> Block {
         color: BlockCategory::Math.into(),
         op_code: "<".to_string(),
         content: BlockContent::builder()
-            .arg(Argument::Number { name: None, value: first })
+            .arg(Argument::Number {
+                name: None,
+                value: first,
+            })
             .text("<")
-            .arg(Argument::Number { name: None, value: second })
+            .arg(Argument::Number {
+                name: None,
+                value: second,
+            })
             .build(),
-        block_type: BlockType::Argument(ArgumentBlockReturnType::Boolean)
+        block_type: BlockType::Argument(ArgumentBlockReturnType::Boolean),
     }
 }
 
 pub fn lte(first: ArgValue<Number>, second: ArgValue<Number>) -> Block {
     // fancy sugar to "first < second || first == second"
-    or(ArgValue::Block(
-        lt(first.clone(), second.clone())
-    ), ArgValue::Block(
-        eq(first, second)
-    ))
+    or(
+        ArgValue::Block(lt(first.clone(), second.clone())),
+        ArgValue::Block(eq(first, second)),
+    )
 }
 
 pub fn gt(first: ArgValue<Number>, second: ArgValue<Number>) -> Block {
@@ -127,21 +144,26 @@ pub fn gt(first: ArgValue<Number>, second: ArgValue<Number>) -> Block {
         color: BlockCategory::Math.into(),
         op_code: ">".to_string(),
         content: BlockContent::builder()
-            .arg(Argument::Number { name: None, value: first })
+            .arg(Argument::Number {
+                name: None,
+                value: first,
+            })
             .text(">")
-            .arg(Argument::Number { name: None, value: second })
+            .arg(Argument::Number {
+                name: None,
+                value: second,
+            })
             .build(),
-        block_type: BlockType::Argument(ArgumentBlockReturnType::Boolean)
+        block_type: BlockType::Argument(ArgumentBlockReturnType::Boolean),
     }
 }
 
 pub fn gte(first: ArgValue<Number>, second: ArgValue<Number>) -> Block {
     // fancy sugar to "first > second || first == second"
-    or(ArgValue::Block(
-        gt(first.clone(), second.clone())
-    ), ArgValue::Block(
-        eq(first, second)
-    ))
+    or(
+        ArgValue::Block(gt(first.clone(), second.clone())),
+        ArgValue::Block(eq(first, second)),
+    )
 }
 
 pub fn eq(first: ArgValue<Number>, second: ArgValue<Number>) -> Block {
@@ -151,11 +173,17 @@ pub fn eq(first: ArgValue<Number>, second: ArgValue<Number>) -> Block {
         color: BlockCategory::Math.into(),
         op_code: "=".to_string(),
         content: BlockContent::builder()
-            .arg(Argument::Number { name: None, value: first })
+            .arg(Argument::Number {
+                name: None,
+                value: first,
+            })
             .text("==")
-            .arg(Argument::Number { name: None, value: second })
+            .arg(Argument::Number {
+                name: None,
+                value: second,
+            })
             .build(),
-        block_type: BlockType::Argument(ArgumentBlockReturnType::Boolean)
+        block_type: BlockType::Argument(ArgumentBlockReturnType::Boolean),
     }
 }
 
@@ -166,11 +194,17 @@ pub fn plus(first: ArgValue<Number>, second: ArgValue<Number>) -> Block {
         color: BlockCategory::Math.into(),
         op_code: "+".to_string(),
         content: BlockContent::builder()
-            .arg(Argument::Number { name: None, value: first })
+            .arg(Argument::Number {
+                name: None,
+                value: first,
+            })
             .text("+")
-            .arg(Argument::Number { name: None, value: second })
+            .arg(Argument::Number {
+                name: None,
+                value: second,
+            })
             .build(),
-        block_type: BlockType::Argument(ArgumentBlockReturnType::Number)
+        block_type: BlockType::Argument(ArgumentBlockReturnType::Number),
     }
 }
 
@@ -181,11 +215,17 @@ pub fn minus(first: ArgValue<Number>, second: ArgValue<Number>) -> Block {
         color: BlockCategory::Math.into(),
         op_code: "-".to_string(),
         content: BlockContent::builder()
-            .arg(Argument::Number { name: None, value: first })
+            .arg(Argument::Number {
+                name: None,
+                value: first,
+            })
             .text("-")
-            .arg(Argument::Number { name: None, value: second })
+            .arg(Argument::Number {
+                name: None,
+                value: second,
+            })
             .build(),
-        block_type: BlockType::Argument(ArgumentBlockReturnType::Number)
+        block_type: BlockType::Argument(ArgumentBlockReturnType::Number),
     }
 }
 
@@ -196,11 +236,17 @@ pub fn multiply(first: ArgValue<Number>, second: ArgValue<Number>) -> Block {
         color: BlockCategory::Math.into(),
         op_code: "*".to_string(),
         content: BlockContent::builder()
-            .arg(Argument::Number { name: None, value: first })
+            .arg(Argument::Number {
+                name: None,
+                value: first,
+            })
             .text("*")
-            .arg(Argument::Number { name: None, value: second })
+            .arg(Argument::Number {
+                name: None,
+                value: second,
+            })
             .build(),
-        block_type: BlockType::Argument(ArgumentBlockReturnType::Number)
+        block_type: BlockType::Argument(ArgumentBlockReturnType::Number),
     }
 }
 
@@ -211,11 +257,17 @@ pub fn divide(first: ArgValue<Number>, second: ArgValue<Number>) -> Block {
         color: BlockCategory::Math.into(),
         op_code: "/".to_string(),
         content: BlockContent::builder()
-            .arg(Argument::Number { name: None, value: first })
+            .arg(Argument::Number {
+                name: None,
+                value: first,
+            })
             .text("/")
-            .arg(Argument::Number { name: None, value: second })
+            .arg(Argument::Number {
+                name: None,
+                value: second,
+            })
             .build(),
-        block_type: BlockType::Argument(ArgumentBlockReturnType::Number)
+        block_type: BlockType::Argument(ArgumentBlockReturnType::Number),
     }
 }
 
@@ -245,7 +297,7 @@ pub fn repeat(value: ArgValue<Number>, nest: Blocks) -> Block {
             .text("repeat")
             .arg(Argument::Number { name: None, value })
             .build(),
-        block_type: BlockType::Control(BlockControl::OneNest)
+        block_type: BlockType::Control(BlockControl::OneNest),
     }
 }
 
@@ -256,7 +308,7 @@ pub fn forever(nest: Blocks) -> Block {
         color: Default::default(),
         op_code: "forever".to_string(),
         content: BlockContent::builder().text("forever").build(),
-        block_type: BlockType::Control(BlockControl::OneNest)
+        block_type: BlockType::Control(BlockControl::OneNest),
     }
 }
 
@@ -268,10 +320,13 @@ pub fn r#if(condition: ArgValue<Boolean>, body: Blocks) -> Block {
         op_code: "if".to_string(),
         content: BlockContent::builder()
             .text("if")
-            .arg(Argument::Boolean { name: None, value: condition })
+            .arg(Argument::Boolean {
+                name: None,
+                value: condition,
+            })
             .text("then")
             .build(),
-        block_type: BlockType::Control(BlockControl::OneNest)
+        block_type: BlockType::Control(BlockControl::OneNest),
     }
 }
 
@@ -283,10 +338,13 @@ pub fn r#if_else(condition: ArgValue<Boolean>, if_body: Blocks, else_body: Block
         op_code: "ifElse".to_string(),
         content: BlockContent::builder()
             .text("if")
-            .arg(Argument::Boolean { name: None, value: condition })
+            .arg(Argument::Boolean {
+                name: None,
+                value: condition,
+            })
             .text("then")
             .build(),
-        block_type: BlockType::Control(BlockControl::TwoNest)
+        block_type: BlockType::Control(BlockControl::TwoNest),
     }
 }
 
@@ -298,12 +356,12 @@ pub fn set_var_int(name: String, value: ArgValue<Number>) -> Block {
             .text("set")
             .arg(Argument::Menu {
                 name: "varInt".to_string(),
-                value: ArgValue::Value(name)
+                value: ArgValue::Value(name),
             })
             .text("to")
             .arg(Argument::Number { name: None, value })
             .build(),
-        BlockType::Regular
+        BlockType::Regular,
     )
 }
 
@@ -315,12 +373,12 @@ pub fn set_var_boolean(name: String, value: ArgValue<Boolean>) -> Block {
             .text("set")
             .arg(Argument::Menu {
                 name: "varBool".to_string(),
-                value: ArgValue::Value(name)
+                value: ArgValue::Value(name),
             })
             .text("to")
             .arg(Argument::Boolean { name: None, value })
             .build(),
-        BlockType::Regular
+        BlockType::Regular,
     )
 }
 
@@ -332,12 +390,12 @@ pub fn set_var_string(name: String, value: ArgValue<String>) -> Block {
             .text("set")
             .arg(Argument::Menu {
                 name: "varStr".to_string(),
-                value: ArgValue::Value(name)
+                value: ArgValue::Value(name),
             })
             .text("to")
             .arg(Argument::String { name: None, value })
             .build(),
-        BlockType::Regular
+        BlockType::Regular,
     )
 }
 
@@ -346,7 +404,7 @@ pub fn get_var(name: String, arg_type: ArgumentBlockReturnType) -> Block {
         BlockCategory::Variable,
         "getVar".to_string(),
         BlockContent::builder().text(name).build(),
-        BlockType::Argument(arg_type)
+        BlockType::Argument(arg_type),
     )
 }
 
@@ -365,7 +423,7 @@ macro_rules! method {
         Member::Method {
             arg_types: $arg_types,
             return_type: $ret_type,
-            generate: $gen_func
+            generate: $gen_func,
         }
     };
 }

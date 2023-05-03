@@ -1,9 +1,9 @@
 use super::parser::*;
+use crate::compiler::layout::compile_view_tree;
 use std::collections::HashMap;
 use swrs::api::view::flatten_views;
-use swrs::parser::Parsable;
 use swrs::parser::view::models::AndroidView;
-use crate::compiler::layout::compile_view_tree;
+use swrs::parser::Parsable;
 
 // simple DSL that constructs SWRS's View using a syntax similar to the layout's syntax
 // i just hate how my is IDE complaining about an unused mut AAAHHHHHHH
@@ -80,8 +80,7 @@ macro_rules! view {
 
 #[test]
 fn parser_simple() {
-    let input =
-        r#"LinearLayout (hello: "world") {
+    let input = r#"LinearLayout (hello: "world") {
     TextView (text: hi): myText,
 
     // ignore this comment!
@@ -104,8 +103,7 @@ fn parser_simple() {
 
 #[test]
 fn compiler_simple() {
-    let input =
-        r#"LinearLayout (hello: "world") {
+    let input = r#"LinearLayout (hello: "world") {
     TextView (text: hi): myText,
 
     // ignore this comment!
@@ -120,16 +118,16 @@ fn compiler_simple() {
 {"adSize":"","adUnitId":"","alpha":1.0,"checked":0,"choiceMode":0,"clickable":1,"customView":"","dividerHeight":1,"enabled":1,"firstDayOfWeek":1,"id":"view1","image":{"rotate":0,"scaleType":"CENTER"},"indeterminate":"false","index":1,"layout":{"backgroundColor":16777215,"gravity":0,"height":-2,"layoutGravity":0,"marginBottom":0,"marginLeft":0,"marginRight":0,"marginTop":0,"orientation":1,"paddingBottom":8,"paddingLeft":8,"paddingRight":8,"paddingTop":8,"weight":0,"weightSum":0,"width":-2},"max":100,"parent":"view0","parentType":0,"preId":"","preIndex":0,"preParentType":0,"progress":0,"progressStyle":"","scaleX":1.0,"scaleY":1.0,"spinnerMode":1,"text":{"hint":"","hintColor":-10453621,"imeOption":0,"inputType":1,"line":0,"singleLine":0,"text":"TextView","textColor":0,"textFont":"default_font","textSize":12,"textType":0},"translationX":0.0,"translationY":0.0,"type":4}"#;
 
     let result = parse_layout(input).unwrap();
-    let result = compile_view_tree(result)
-        .expect("failed to compile view");
+    let result = compile_view_tree(result).expect("failed to compile view");
 
     let result = flatten_views(vec![result], None, None)
         .into_iter()
-        .try_fold(String::new(), |acc, view|
-            Ok::<String, <AndroidView as Parsable>::ReconstructionError>(
-                format!("{acc}\n{}", view.reconstruct()?)
-            )
-        )
+        .try_fold(String::new(), |acc, view| {
+            Ok::<String, <AndroidView as Parsable>::ReconstructionError>(format!(
+                "{acc}\n{}",
+                view.reconstruct()?
+            ))
+        })
         .expect("failed to reconstruct view");
 
     assert_eq!(expected, result.trim());

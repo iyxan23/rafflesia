@@ -1,81 +1,118 @@
+use super::ast::*;
 use anyhow::Result;
+use buffered_lexer::error::ParseError;
 use buffered_lexer::{BufferedLexer, SpannedTokenOwned};
 use logos::Logos;
-use super::ast::*;
-use buffered_lexer::error::ParseError;
 
 pub fn parse_logic(raw: &str) -> LogicParseResult<OuterStatements> {
-    let mut lex: BufferedLexer<'_, Token>
-        = BufferedLexer::new(Token::lexer(raw), Token::Error);
+    let mut lex: BufferedLexer<'_, Token> = BufferedLexer::new(Token::lexer(raw), Token::Error);
 
     outer_statements(&mut lex)
 }
 
 #[derive(Logos, PartialEq, Debug, Clone)]
 pub enum Token {
-
     // arithmetic operations
-    #[token("**")] Pow,
-    #[token("*")] Mult,
-    #[token("/")] Div,
-    #[token("+")] Plus,
-    #[token("-")] Minus,
+    #[token("**")]
+    Pow,
+    #[token("*")]
+    Mult,
+    #[token("/")]
+    Div,
+    #[token("+")]
+    Plus,
+    #[token("-")]
+    Minus,
 
     // delimiter
-    #[token(",")] Comma,
-    #[token("\n")] Newline,
+    #[token(",")]
+    Comma,
+    #[token("\n")]
+    Newline,
 
-    #[token("(")] LParen,
-    #[token(")")] RParen,
-    #[token("[")] LBracket,
-    #[token("]")] RBracket,
-    #[token("{")] LBrace,
-    #[token("}")] RBrace,
+    #[token("(")]
+    LParen,
+    #[token(")")]
+    RParen,
+    #[token("[")]
+    LBracket,
+    #[token("]")]
+    RBracket,
+    #[token("{")]
+    LBrace,
+    #[token("}")]
+    RBrace,
 
-    #[token(".")] DOT,
+    #[token(".")]
+    DOT,
 
     // boolean operators
-    #[token("!")] Not,
-    #[token("==")] DEQ,
-    #[token("=")] EQ,
-    #[token("<")] LT,
-    #[token("<=")] LTE,
-    #[token(">")] GT,
-    #[token(">=")] GTE,
+    #[token("!")]
+    Not,
+    #[token("==")]
+    DEQ,
+    #[token("=")]
+    EQ,
+    #[token("<")]
+    LT,
+    #[token("<=")]
+    LTE,
+    #[token(">")]
+    GT,
+    #[token(">=")]
+    GTE,
 
-    #[token("&&")] And,
-    #[token("||")] Or,
+    #[token("&&")]
+    And,
+    #[token("||")]
+    Or,
 
     // types
-    #[token("number")] NumberType,
-    #[token("string")] StringType,
-    #[token("boolean")] BooleanType,
-    #[token("map")] MapType,
-    #[token("list")] ListType,
+    #[token("number")]
+    NumberType,
+    #[token("string")]
+    StringType,
+    #[token("boolean")]
+    BooleanType,
+    #[token("map")]
+    MapType,
+    #[token("list")]
+    ListType,
 
     // compound statements
-    #[token("if")] If,
-    #[token("else")] Else,
-    #[token("repeat")] Repeat,
-    #[token("forever")] Forever,
+    #[token("if")]
+    If,
+    #[token("else")]
+    Else,
+    #[token("repeat")]
+    Repeat,
+    #[token("forever")]
+    Forever,
 
     // simple statements
-    #[token("break")] Break,
-    #[token("continue")] Continue,
+    #[token("break")]
+    Break,
+    #[token("continue")]
+    Continue,
 
     // literals
-    #[token("true")] True,
-    #[token("false")] False,
+    #[token("true")]
+    True,
+    #[token("false")]
+    False,
 
-    #[regex(r#""([^"]|\\")*""#)] String,
-    #[regex("[0-9]+(?:\\.[0-9]+)?")] Number,
+    #[regex(r#""([^"]|\\")*""#)]
+    String,
+    #[regex("[0-9]+(?:\\.[0-9]+)?")]
+    Number,
 
-    #[regex(r"[a-zA-Z_][a-zA-Z0-9_]*")] Identifier,
+    #[regex(r"[a-zA-Z_][a-zA-Z0-9_]*")]
+    Identifier,
 
     #[error]
     #[regex(r"[ \t]+", logos::skip)] // whitespace
     #[regex(r"//[^\n]*\n?", logos::skip)] // comment
-    Error
+    Error,
 }
 
 pub type LogicParseError = ParseError<Token, SpannedTokenOwned<Token>>;
@@ -100,7 +137,7 @@ fn outer_statements(lex: &mut Lexer) -> LogicParseResult<OuterStatements> {
             match err {
                 ParseError::EOF { .. } => break,
                 ParseError::LexerError { .. } => return Err(err),
-                _ => unreachable!()
+                _ => unreachable!(),
             }
         }
 
@@ -119,10 +156,19 @@ fn outer_statement(lex: &mut Lexer) -> LogicParseResult<OuterStatement> {
 
     let res = match lex.expect_peek_multiple_choices(
         // expects a type, complex type, or an event identifier
-        &[Token::NumberType, Token::StringType, Token::BooleanType, Token::MapType,
-             Token::ListType, Token::Identifier]
+        &[
+            Token::NumberType,
+            Token::StringType,
+            Token::BooleanType,
+            Token::MapType,
+            Token::ListType,
+            Token::Identifier,
+        ],
     )? {
-        SpannedTokenOwned { token: Token::Identifier, .. } => outer_event_definition(lex),
+        SpannedTokenOwned {
+            token: Token::Identifier,
+            ..
+        } => outer_event_definition(lex),
         SpannedTokenOwned {
             token: Token::NumberType | Token::StringType | Token::BooleanType,
             ..
@@ -131,7 +177,7 @@ fn outer_statement(lex: &mut Lexer) -> LogicParseResult<OuterStatement> {
             token: Token::MapType | Token::ListType,
             ..
         } => outer_complex_variable_declaration(lex),
-        _ => unreachable!()
+        _ => unreachable!(),
     };
 
     lex.success();
@@ -141,13 +187,24 @@ fn outer_statement(lex: &mut Lexer) -> LogicParseResult<OuterStatement> {
 fn simple_variable_type(lex: &mut Lexer) -> LogicParseResult<VariableType> {
     lex.start();
 
-    let res = match lex.expect_multiple_choices(
-        &[Token::NumberType, Token::StringType, Token::BooleanType]
-    )? {
-        SpannedTokenOwned { token: Token::NumberType, .. } => VariableType::Number,
-        SpannedTokenOwned { token: Token::StringType, .. } => VariableType::String,
-        SpannedTokenOwned { token: Token::BooleanType, .. } => VariableType::Boolean,
-        _ => unreachable!()
+    let res = match lex.expect_multiple_choices(&[
+        Token::NumberType,
+        Token::StringType,
+        Token::BooleanType,
+    ])? {
+        SpannedTokenOwned {
+            token: Token::NumberType,
+            ..
+        } => VariableType::Number,
+        SpannedTokenOwned {
+            token: Token::StringType,
+            ..
+        } => VariableType::String,
+        SpannedTokenOwned {
+            token: Token::BooleanType,
+            ..
+        } => VariableType::Boolean,
+        _ => unreachable!(),
     };
 
     lex.success();
@@ -173,15 +230,22 @@ fn outer_variable_declaration(lex: &mut Lexer) -> LogicParseResult<OuterStatemen
 fn outer_complex_variable_declaration(lex: &mut Lexer) -> LogicParseResult<OuterStatement> {
     lex.start();
 
-    enum ComplexVariableTokenType { Map, List }
+    enum ComplexVariableTokenType {
+        Map,
+        List,
+    }
 
     // get the type
-    let cx_var_tok_type = match lex.expect_multiple_choices(
-        &[Token::MapType, Token::ListType]
-    )? {
-        SpannedTokenOwned { token: Token::MapType, .. } => ComplexVariableTokenType::Map,
-        SpannedTokenOwned { token: Token::ListType, .. } => ComplexVariableTokenType::List,
-        _ => unreachable!()
+    let cx_var_tok_type = match lex.expect_multiple_choices(&[Token::MapType, Token::ListType])? {
+        SpannedTokenOwned {
+            token: Token::MapType,
+            ..
+        } => ComplexVariableTokenType::Map,
+        SpannedTokenOwned {
+            token: Token::ListType,
+            ..
+        } => ComplexVariableTokenType::List,
+        _ => unreachable!(),
     };
 
     // open the <>
@@ -199,9 +263,9 @@ fn outer_complex_variable_declaration(lex: &mut Lexer) -> LogicParseResult<Outer
     Ok(OuterStatement::ComplexVariableDeclaration {
         variable_type: match cx_var_tok_type {
             ComplexVariableTokenType::Map => ComplexVariableType::Map { inner_type },
-            ComplexVariableTokenType::List => ComplexVariableType::List { inner_type }
+            ComplexVariableTokenType::List => ComplexVariableType::List { inner_type },
         },
-        identifier
+        identifier,
     })
 }
 
@@ -227,9 +291,8 @@ fn outer_event_definition(lex: &mut Lexer) -> LogicParseResult<OuterStatement> {
         Ok(OuterStatement::ViewEventListener {
             view_id: name,
             event_name,
-            body: statements
+            body: statements,
         })
-
     } else {
         // parse the body of this event
         // where the real fun begins :sunglasses:
@@ -257,7 +320,9 @@ fn inner_statements(lex: &mut Lexer) -> LogicParseResult<InnerStatements> {
 
         // check if we've reached the end (a closing brace)
         let res = buffered_lexer::propagate_non_recoverable!(lex.expect_peek(Token::RBrace));
-        if res.is_ok() { break; }
+        if res.is_ok() {
+            break;
+        }
 
         statements.0.push(inner_statement(lex)?);
     }
@@ -270,22 +335,33 @@ fn inner_statement(lex: &mut Lexer) -> LogicParseResult<InnerStatement> {
     lex.start();
 
     let res = match lex.peek()? {
-        SpannedTokenOwned { token: Token::If, .. } =>
-            InnerStatement::IfStatement(if_statement(lex)?),
-        SpannedTokenOwned { token: Token::Repeat, .. } =>
-            InnerStatement::RepeatStatement(repeat_statement(lex)?),
-        SpannedTokenOwned { token: Token::Forever, .. } =>
-            InnerStatement::ForeverStatement(forever_statement(lex)?),
+        SpannedTokenOwned {
+            token: Token::If, ..
+        } => InnerStatement::IfStatement(if_statement(lex)?),
+        SpannedTokenOwned {
+            token: Token::Repeat,
+            ..
+        } => InnerStatement::RepeatStatement(repeat_statement(lex)?),
+        SpannedTokenOwned {
+            token: Token::Forever,
+            ..
+        } => InnerStatement::ForeverStatement(forever_statement(lex)?),
 
-        SpannedTokenOwned { token: Token::Break, .. } => {
+        SpannedTokenOwned {
+            token: Token::Break,
+            ..
+        } => {
             lex.next().unwrap();
             InnerStatement::Break
-        },
+        }
 
-        SpannedTokenOwned { token: Token::Continue, .. } => {
+        SpannedTokenOwned {
+            token: Token::Continue,
+            ..
+        } => {
             lex.next().unwrap();
             InnerStatement::Continue
-        },
+        }
 
         SpannedTokenOwned { .. } => {
             // can either be variable assignment or an expression (that can be a function or
@@ -294,9 +370,9 @@ fn inner_statement(lex: &mut Lexer) -> LogicParseResult<InnerStatement> {
             let expr = expression(lex)?;
 
             // expression will think that this is just a variable access
-            if let Expression::PrimaryExpression(
-                PrimaryExpression::VariableAccess { from, name }
-            ) = expr {
+            if let Expression::PrimaryExpression(PrimaryExpression::VariableAccess { from, name }) =
+                expr
+            {
                 if let None = from {
                     // regular name = value statement
                     lex.expect(Token::EQ)?;
@@ -304,12 +380,12 @@ fn inner_statement(lex: &mut Lexer) -> LogicParseResult<InnerStatement> {
 
                     InnerStatement::VariableAssignment(VariableAssignment {
                         identifier: name,
-                        value
+                        value,
                     })
                 } else {
                     // todo: implement from.name = value
                     InnerStatement::Expression(Expression::PrimaryExpression(
-                        PrimaryExpression::VariableAccess { from, name }
+                        PrimaryExpression::VariableAccess { from, name },
                     ))
                 }
             } else {
@@ -342,7 +418,9 @@ fn if_statement(lex: &mut Lexer) -> LogicParseResult<IfStatement> {
         lex.expect(Token::RBrace)?;
 
         Some(else_body)
-    } else { None };
+    } else {
+        None
+    };
 
     lex.success();
     Ok(IfStatement {
@@ -422,9 +500,7 @@ fn boolean_expression(lex: &mut Lexer) -> LogicParseResult<Expression> {
     let first_branch = comparison_expression(lex)?;
     let mut result = first_branch;
 
-    while let Ok(tok) =
-        lex.expect_peek_multiple_choices(&[Token::Or, Token::And]) {
-
+    while let Ok(tok) = lex.expect_peek_multiple_choices(&[Token::Or, Token::And]) {
         // skip the next token because we've peeked it
         let _ = lex.next();
 
@@ -434,7 +510,7 @@ fn boolean_expression(lex: &mut Lexer) -> LogicParseResult<Expression> {
         result = Expression::BinOp {
             first: Box::new(result),
             operator,
-            second: Box::new(second_branch)
+            second: Box::new(second_branch),
         };
     }
 
@@ -452,18 +528,20 @@ fn comparison_expression(lex: &mut Lexer) -> LogicParseResult<Expression> {
         lex.success();
         return Ok(Expression::UnaryOp {
             value: Box::new(expr),
-            operator: UnaryOperator::Not
-        })
+            operator: UnaryOperator::Not,
+        });
     }
 
     let first_branch = arithmetic_expression(lex)?;
     let mut result = first_branch;
 
-    while let Ok(tok) =
-        lex.expect_peek_multiple_choices(&[
-            Token::LT, Token::GT, Token::DEQ, Token::LTE, Token::GTE
-        ]) {
-
+    while let Ok(tok) = lex.expect_peek_multiple_choices(&[
+        Token::LT,
+        Token::GT,
+        Token::DEQ,
+        Token::LTE,
+        Token::GTE,
+    ]) {
         // skip the next token because we've peeked it
         let _ = lex.next();
 
@@ -476,7 +554,7 @@ fn comparison_expression(lex: &mut Lexer) -> LogicParseResult<Expression> {
         result = Expression::BinOp {
             first: Box::new(result),
             operator,
-            second: Box::new(second_branch)
+            second: Box::new(second_branch),
         };
     }
 
@@ -490,9 +568,7 @@ fn arithmetic_expression(lex: &mut Lexer) -> LogicParseResult<Expression> {
     let first_branch = term(lex)?;
     let mut result = first_branch;
 
-    while let Ok(tok) =
-        lex.expect_peek_multiple_choices(&[Token::Plus, Token::Minus]) {
-
+    while let Ok(tok) = lex.expect_peek_multiple_choices(&[Token::Plus, Token::Minus]) {
         // skip the next token because we've peeked it
         let _ = lex.next();
 
@@ -502,7 +578,7 @@ fn arithmetic_expression(lex: &mut Lexer) -> LogicParseResult<Expression> {
         result = Expression::BinOp {
             first: Box::new(result),
             operator,
-            second: Box::new(second_branch)
+            second: Box::new(second_branch),
         };
     }
 
@@ -516,9 +592,7 @@ fn term(lex: &mut Lexer) -> LogicParseResult<Expression> {
     let first_branch = factor(lex)?;
     let mut result = first_branch;
 
-    while let Ok(tok) =
-        lex.expect_peek_multiple_choices(&[Token::Mult, Token::Div]) {
-
+    while let Ok(tok) = lex.expect_peek_multiple_choices(&[Token::Mult, Token::Div]) {
         // skip the next token because we've peeked it
         let _ = lex.next();
 
@@ -528,7 +602,7 @@ fn term(lex: &mut Lexer) -> LogicParseResult<Expression> {
         result = Expression::BinOp {
             first: Box::new(result),
             operator,
-            second: Box::new(second_branch)
+            second: Box::new(second_branch),
         };
     }
 
@@ -545,8 +619,8 @@ fn factor(lex: &mut Lexer) -> LogicParseResult<Expression> {
         lex.success();
         return Ok(Expression::UnaryOp {
             value: Box::new(factor),
-            operator: UnaryOperator::Plus
-        })
+            operator: UnaryOperator::Plus,
+        });
     }
 
     if lex.expect_failsafe_wo_eof(Token::Minus)?.is_some() {
@@ -555,8 +629,8 @@ fn factor(lex: &mut Lexer) -> LogicParseResult<Expression> {
         lex.success();
         return Ok(Expression::UnaryOp {
             value: Box::new(factor),
-            operator: UnaryOperator::Minus
-        })
+            operator: UnaryOperator::Minus,
+        });
     }
 
     lex.success();
@@ -574,7 +648,7 @@ fn power(lex: &mut Lexer) -> LogicParseResult<Expression> {
         Expression::BinOp {
             first: Box::new(primary),
             operator: BinaryOperator::Power,
-            second: Box::new(power)
+            second: Box::new(power),
         }
     } else {
         lex.success();
@@ -589,8 +663,8 @@ fn primary(lex: &mut Lexer) -> LogicParseResult<Expression> {
     let mut result = atom;
 
     while let Ok(tok) =
-        lex.expect_peek_multiple_choices(&[Token::DOT, Token::LBracket, Token::LParen]) {
-
+        lex.expect_peek_multiple_choices(&[Token::DOT, Token::LBracket, Token::LParen])
+    {
         // skip the next token because we've peeked it
         let _ = lex.next();
 
@@ -652,7 +726,9 @@ fn arguments(lex: &mut Lexer) -> LogicParseResult<Arguments> {
 
     while lex.expect_failsafe_wo_eof(Token::Comma)?.is_some() {
         let r_paren = buffered_lexer::propagate_non_recoverable!(lex.expect_peek(Token::RParen));
-        if r_paren.is_ok() { break; }
+        if r_paren.is_ok() {
+            break;
+        }
 
         arguments.push(expression(lex)?);
     }
@@ -664,48 +740,73 @@ fn arguments(lex: &mut Lexer) -> LogicParseResult<Arguments> {
 fn atom(lex: &mut Lexer) -> LogicParseResult<Expression> {
     lex.start();
 
-    match lex.expect_multiple_choices(
-        &vec![
-            Token::Identifier, Token::String, Token::Number, Token::False, Token::True,
-            Token::LParen
-        ]
-    )? {
-        SpannedTokenOwned { token: Token::Identifier, slice, .. } => {
+    match lex.expect_multiple_choices(&vec![
+        Token::Identifier,
+        Token::String,
+        Token::Number,
+        Token::False,
+        Token::True,
+        Token::LParen,
+    ])? {
+        SpannedTokenOwned {
+            token: Token::Identifier,
+            slice,
+            ..
+        } => {
             lex.success();
-            Ok(Expression::PrimaryExpression(PrimaryExpression::VariableAccess {
-                from: None,
-                name: slice
-            }))
+            Ok(Expression::PrimaryExpression(
+                PrimaryExpression::VariableAccess {
+                    from: None,
+                    name: slice,
+                },
+            ))
         }
-        SpannedTokenOwned { token: Token::String, slice, .. } => {
+        SpannedTokenOwned {
+            token: Token::String,
+            slice,
+            ..
+        } => {
             lex.success();
-            Ok(Expression::Literal(Literal::String(slice[1..slice.len() - 1].to_string())))
+            Ok(Expression::Literal(Literal::String(
+                slice[1..slice.len() - 1].to_string(),
+            )))
         }
-        SpannedTokenOwned { token: Token::Number, slice, pos } => {
-            let num = slice.parse::<f64>()
-                .map_err(|_| ParseError::LexerError {
-                    err_token: Token::Number,
-                    pos: pos.clone(),
-                    slice: slice.to_string(),
-                })?;
+        SpannedTokenOwned {
+            token: Token::Number,
+            slice,
+            pos,
+        } => {
+            let num = slice.parse::<f64>().map_err(|_| ParseError::LexerError {
+                err_token: Token::Number,
+                pos: pos.clone(),
+                slice: slice.to_string(),
+            })?;
 
             lex.success();
             Ok(Expression::Literal(Literal::Number(num)))
         }
-        SpannedTokenOwned { token: Token::False, .. } => {
+        SpannedTokenOwned {
+            token: Token::False,
+            ..
+        } => {
             lex.success();
             Ok(Expression::Literal(Literal::Boolean(false)))
         }
-        SpannedTokenOwned { token: Token::True, .. } => {
+        SpannedTokenOwned {
+            token: Token::True, ..
+        } => {
             lex.success();
             Ok(Expression::Literal(Literal::Boolean(true)))
         }
-        SpannedTokenOwned { token: Token::LParen, .. } => {
+        SpannedTokenOwned {
+            token: Token::LParen,
+            ..
+        } => {
             lex.restore();
 
             Ok(group(lex)?)
         }
-        _ => unreachable!()
+        _ => unreachable!(),
     }
 }
 
