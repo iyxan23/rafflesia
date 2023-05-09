@@ -14,12 +14,6 @@ mod tests;
 #[derive(Debug, Clone, PartialEq)]
 pub struct BlockDefinitions(pub Vec<BlockDefinition>);
 
-impl Default for BlockDefinitions {
-    fn default() -> Self {
-        Self(Vec::default())
-    }
-}
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct BlockDefinition {
     pub block_type: BlockType,
