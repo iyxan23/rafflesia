@@ -45,8 +45,8 @@ jobs:
       - name: Build with trunk
         run: cd rafflesia-web && trunk build --public-url rafflesia/ --release
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+      - name: Upload pages artifact
+        uses: actions/upload-pages-artifact@v3
         with:
           path: rafflesia-web/dist/
 
