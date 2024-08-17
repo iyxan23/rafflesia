@@ -188,8 +188,9 @@ fn binding_body<'src, I: ValueInput<'src, Token = Token<'src>, Span = SimpleSpan
         .then_ignore(just(Token::Dot))
         .then(function_call.clone())
         .map(|(this, func)| {
-            let BindingBody::FunctionCall { name, arguments } = func
-                    else { unreachable!() };
+            let BindingBody::FunctionCall { name, arguments } = func else {
+                unreachable!()
+            };
 
             BindingBody::MethodCall {
                 name,
@@ -201,19 +202,24 @@ fn binding_body<'src, I: ValueInput<'src, Token = Token<'src>, Span = SimpleSpan
     let method_call_with_arguments = expr.validate(|expr, span, emitter| {
         // method_call gets called the last, meaning that blocks or functions
         // should already be parsed with the parsers above.
-        let Expression::MethodCall { name, arguments, this } = expr
-                    else {
-                        emitter.emit(
-                            Rich::custom(span, "bug: unexpected expression other than MethodCall")
-                        );
+        let Expression::MethodCall {
+            name,
+            arguments,
+            this,
+        } = expr
+        else {
+            emitter.emit(Rich::custom(
+                span.span(),
+                "bug: unexpected expression other than MethodCall",
+            ));
 
-                        // ...okay what to return then?
-                        return BindingBody::MethodCall {
-                            name: "<invalid>".to_string(),
-                            this: Expression::StaticVariable(StaticVariable::This),
-                            arguments: None
-                        };
-                    };
+            // ...okay what to return then?
+            return BindingBody::MethodCall {
+                name: "<invalid>".to_string(),
+                this: Expression::StaticVariable(StaticVariable::This),
+                arguments: None,
+            };
+        };
 
         // we transform it into a BindingBody::MethodCall
         BindingBody::MethodCall {
@@ -417,8 +423,9 @@ fn expr<'src, I: ValueInput<'src, Token = Token<'src>, Span = SimpleSpan>>(
                 if let Some(method_call) = method_call {
                     // safety: method_call can never be anything else other than
                     //         Expression::FunctionCall, see the parser function_call
-                    let Expression::FunctionCall { name, arguments } = method_call
-                        else { unreachable!() };
+                    let Expression::FunctionCall { name, arguments } = method_call else {
+                        unreachable!()
+                    };
 
                     Expression::MethodCall {
                         name,
