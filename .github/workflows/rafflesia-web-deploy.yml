@@ -26,7 +26,7 @@ jobs:
           submodules: recursive
 
       - name: Setup Pages
-        uses: actions/configure-pages@v3
+        uses: actions/configure-pages@v5
 
       # - name: Setup Rust
       #   uses: ATiltedTree/setup-rust@v1.0.5
@@ -46,7 +46,7 @@ jobs:
         run: cd rafflesia-web && trunk build --public-url rafflesia/ --release
 
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v1
+        uses: actions/upload-pages-artifact@v4
         with:
           path: rafflesia-web/dist/
 
@@ -60,4 +60,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v2
+        uses: actions/deploy-pages@v4
